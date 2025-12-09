@@ -14,7 +14,9 @@ from datetime import datetime
 import csv
 
 # ТОКЕН В КАВЫЧ
-TOKEN = "7885996503:AAHePHy39oRp0AEbEai0xMo2LzztotTYPw4"
+import os
+TOKEN = os.getenv("TOKEN")
+
 
 # === ФУНКЦИЯ ЛОГА СТАТИСТИКИ ===
 

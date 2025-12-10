@@ -12,10 +12,39 @@ from telegram.ext import (
 )
 from datetime import datetime
 import csv
-
-# ТОКЕН В КАВЫЧ
 import os
+import json
+
+# ТОКЕН ИЗ ПЕРЕМЕННОЙ ОКРУЖЕНИЯ
 TOKEN = os.getenv("TOKEN")
+
+# ФАЙЛ ДЛЯ СОХРАНЕНИЯ ПОСЛЕДНЕГО ПОСТА С РАСПИСАНИЕМ
+SCHEDULE_FILE = "schedule.json"
+
+
+# === ФУНКЦИИ РАБОТЫ С РАСПИСАНИЕМ ===
+
+def save_schedule(chat_id: int, message_id: int) -> None:
+    """Сохраняем, откуда копировать пост с расписанием."""
+    data = {"chat_id": chat_id, "message_id": message_id}
+    try:
+        with open(SCHEDULE_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f)
+        print("Сохранил новое расписание:", data)
+    except Exception as e:
+        print("Ошибка сохранения расписания:", e)
+
+
+def load_schedule():
+    """Читаем сохранённый пост с расписанием, если он есть."""
+    if not os.path.exists(SCHEDULE_FILE):
+        return None
+    try:
+        with open(SCHEDULE_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception as e:
+        print("Ошибка чтения расписания:", e)
+        return None
 
 
 # === ФУНКЦИЯ ЛОГА СТАТИСТИКИ ===
@@ -38,6 +67,7 @@ def log_event(user, action: str):
     except Exception as e:
         print("Ошибка записи статистики:", e)
 
+
 # === КЛАВИАТУРЫ ===
 
 def main_menu_keyboard() -> ReplyKeyboardMarkup:
@@ -48,6 +78,7 @@ def main_menu_keyboard() -> ReplyKeyboardMarkup:
     ]
     return ReplyKeyboardMarkup(buttons, resize_keyboard=True)
 
+
 def main_menu_with_back_keyboard() -> ReplyKeyboardMarkup:
     buttons = [
         [KeyboardButton("Расписание")],
@@ -57,6 +88,7 @@ def main_menu_with_back_keyboard() -> ReplyKeyboardMarkup:
     ]
     return ReplyKeyboardMarkup(buttons, resize_keyboard=True)
 
+
 def features_menu_keyboard() -> ReplyKeyboardMarkup:
     buttons = [
         [KeyboardButton("Хочу служить"), KeyboardButton("Задать вопрос / предложение")],
@@ -64,6 +96,7 @@ def features_menu_keyboard() -> ReplyKeyboardMarkup:
         [KeyboardButton("Назад")],
     ]
     return ReplyKeyboardMarkup(buttons, resize_keyboard=True)
+
 
 # === ВОЗВРАТ НА СТАРТОВЫЙ ЭКРАН ===
 
@@ -87,6 +120,7 @@ async def send_start_screen(update: Update):
         reply_markup=main_menu_keyboard(),
     )
 
+
 # === /START ===
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -94,7 +128,25 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     log_event(user, "/start")
     await send_start_screen(update)
 
-# === ОСНОВНОЙ ХЕНДЛЕР ===
+
+# === ХЕНДЛЕР ПОСТОВ КАНАЛА (ЛОВИМ ФРАЗУ ИЗ РАСПИСАНИЯ) ===
+
+async def handle_channel_post(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    msg = update.channel_post
+    if not msg:
+        return
+
+    text = (msg.text or msg.caption or "").lower()
+
+    # фраза, которая есть только в посте с расписанием
+    phrase1 = "для тех, кто ещё не нашёл своё служение"
+    phrase2 = "для тех, кто еще не нашел свое служение"  # вариант без ё
+
+    if phrase1 in text or phrase2 in text:
+        save_schedule(msg.chat_id, msg.message_id)
+
+
+# === ОСНОВНОЙ ХЕНДЛЕР ТЕКСТА ===
 
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = (update.message.text or "").strip()
@@ -122,6 +174,22 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # --- РАСПИСАНИЕ ---
     if text == "Расписание":
         log_event(user, "Расписание")
+
+        # Пытаемся взять последнее расписание из канала
+        data = load_schedule()
+        if data:
+            try:
+                # Копируем пост из канала пользователю
+                await context.bot.copy_message(
+                    chat_id=update.effective_chat.id,
+                    from_chat_id=data["chat_id"],
+                    message_id=data["message_id"],
+                )
+                return
+            except Exception as e:
+                print("Ошибка копирования расписания:", e)
+
+        # Если нет сохранённого расписания или ошибка — запасной вариант
         try:
             await update.message.reply_photo(
                 photo=open("time.jpg", "rb"),
@@ -262,15 +330,22 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=main_menu_keyboard(),
     )
 
+
 # === ЗАПУСК БОТА ===
 
 def main():
     app = ApplicationBuilder().token(TOKEN).build()
+
+    # /start
     app.add_handler(CommandHandler("start", start))
+    # посты в канале (бот должен быть админом канала)
+    app.add_handler(MessageHandler(filters.ChatType.CHANNEL, handle_channel_post))
+    # личка/чаты
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
 
     print("Бот запущен. Нажми Ctrl+C, чтобы остановить.")
     app.run_polling()
+
 
 if __name__ == "__main__":
     main()

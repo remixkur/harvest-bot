@@ -1,8 +1,4 @@
-from telegram import (
-    Update,
-    ReplyKeyboardMarkup,
-    KeyboardButton,
-)
+from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
@@ -10,44 +6,24 @@ from telegram.ext import (
     ContextTypes,
     filters,
 )
+
 from datetime import datetime
 import csv
 import os
-import json
-
-# ТОКЕН ИЗ ПЕРЕМЕННОЙ ОКРУЖЕНИЯ
-TOKEN = os.getenv("TOKEN")
-
-# ФАЙЛ ДЛЯ СОХРАНЕНИЯ ПОСЛЕДНЕГО ПОСТА С РАСПИСАНИЕМ
-SCHEDULE_FILE = "schedule.json"
 
 
-# === ФУНКЦИИ РАБОТЫ С РАСПИСАНИЕМ ===
+# === НАСТРОЙКИ ===
 
-def save_schedule(chat_id: int, message_id: int) -> None:
-    """Сохраняем, откуда копировать пост с расписанием."""
-    data = {"chat_id": chat_id, "message_id": message_id}
-    try:
-        with open(SCHEDULE_FILE, "w", encoding="utf-8") as f:
-            json.dump(data, f)
-        print("Сохранил новое расписание:", data)
-    except Exception as e:
-        print("Ошибка сохранения расписания:", e)
+TOKEN = os.getenv("TOKEN")  # переменная окружения TOKEN
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))  # папка, где лежит bot.py
 
 
-def load_schedule():
-    """Читаем сохранённый пост с расписанием, если он есть."""
-    if not os.path.exists(SCHEDULE_FILE):
-        return None
-    try:
-        with open(SCHEDULE_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except Exception as e:
-        print("Ошибка чтения расписания:", e)
-        return None
+# === УТИЛИТЫ ===
 
+def abs_path(filename: str) -> str:
+    """Абсолютный путь к файлам рядом с bot.py"""
+    return os.path.join(BASE_DIR, filename)
 
-# === ФУНКЦИЯ ЛОГА СТАТИСТИКИ ===
 
 def log_event(user, action: str):
     """
@@ -55,7 +31,7 @@ def log_event(user, action: str):
     время; id; username; имя; действие
     """
     try:
-        with open("stats.csv", "a", newline="", encoding="utf-8") as f:
+        with open(abs_path("stats.csv"), "a", newline="", encoding="utf-8") as f:
             writer = csv.writer(f, delimiter=";")
             writer.writerow([
                 datetime.now().isoformat(timespec="seconds"),
@@ -66,6 +42,24 @@ def log_event(user, action: str):
             ])
     except Exception as e:
         print("Ошибка записи статистики:", e)
+
+
+async def safe_reply_photo(update: Update, filename: str, caption: str = "", parse_mode: str | None = None, reply_markup=None) -> bool:
+    """
+    Пытаемся отправить фото. Если не получилось — возвращаем False.
+    """
+    try:
+        with open(abs_path(filename), "rb") as f:
+            await update.message.reply_photo(
+                photo=f,
+                caption=caption,
+                parse_mode=parse_mode,
+                reply_markup=reply_markup,
+            )
+        return True
+    except Exception as e:
+        print(f"Ошибка при отправке фото {filename}:", e)
+        return False
 
 
 # === КЛАВИАТУРЫ ===
@@ -98,27 +92,40 @@ def features_menu_keyboard() -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup(buttons, resize_keyboard=True)
 
 
-# === ВОЗВРАТ НА СТАРТОВЫЙ ЭКРАН ===
+# === СТАРТОВЫЙ ЭКРАН ===
+
+START_CAPTION = (
+    'привет! давай знакомиться?\n\n'
+    '• это бот молодежного служения Церковь "Жатвы", г. Курган.\n'
+    'если хочешь узнать о нас больше — заходи в тг-канал:\n'
+    '<a href="https://t.me/HarvestYouth">HarvestYouth</a>\n\n'
+    '• каждое воскресенье в 14:30 я жду тебя по адресу:\n'
+    '<a href="https://yandex.ru/maps/-/CLseE4oL">Курган, ул. Техническая, д. 8</a>\n\n'
+    '• если ты пришел на молодежку первый раз — обязательно напиши:\n'
+    '@romanmurash, будем на связи'
+)
+
 
 async def send_start_screen(update: Update):
     user = update.message.from_user
     log_event(user, "start_screen")
 
-    await update.message.reply_photo(
-        photo=open("welcome.jpg", "rb"),
-        caption=(
-            'привет! давай знакомиться?\n\n'
-            '• это бот молодежного служения Церковь "Жатвы", г. Курган.\n'
-            'если хочешь узнать о нас больше — заходи в тг-канал:\n'
-            '<a href="https://t.me/HarvestYouth">HarvestYouth</a>\n\n'
-            '• каждое воскресенье в 14:30 я жду тебя по адресу:\n'
-            '<a href="https://yandex.ru/maps/-/CLseE4oL">Курган, ул. Техническая, д. 8</a>\n\n'
-            '• если ты пришел на молодежку первый раз — обязательно напиши:\n'
-            '@romanmurash, будем на связи'
-        ),
+    # Пытаемся отправить welcome-картинку.
+    ok = await safe_reply_photo(
+        update,
+        "welcome.jpg",
+        caption=START_CAPTION,
         parse_mode="HTML",
         reply_markup=main_menu_keyboard(),
     )
+
+    # Если фото не отправилось — всё равно показываем текст и меню.
+    if not ok:
+        await update.message.reply_text(
+            START_CAPTION,
+            parse_mode="HTML",
+            reply_markup=main_menu_keyboard(),
+        )
 
 
 # === /START ===
@@ -129,24 +136,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await send_start_screen(update)
 
 
-# === ХЕНДЛЕР ПОСТОВ КАНАЛА (ЛОВИМ ФРАЗУ ИЗ РАСПИСАНИЯ) ===
-
-async def handle_channel_post(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    msg = update.channel_post
-    if not msg:
-        return
-
-    text = (msg.text or msg.caption or "").lower()
-
-    # фраза, которая есть только в посте с расписанием
-    phrase1 = "для тех, кто ещё не нашёл своё служение"
-    phrase2 = "для тех, кто еще не нашел свое служение"  # вариант без ё
-
-    if phrase1 in text or phrase2 in text:
-        save_schedule(msg.chat_id, msg.message_id)
-
-
-# === ОСНОВНОЙ ХЕНДЛЕР ТЕКСТА ===
+# === ОСНОВНОЙ ХЕНДЛЕР ===
 
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = (update.message.text or "").strip()
@@ -167,43 +157,31 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             '<a href="https://t.me/HarvestYouth/890">о нас</a>'
         )
         await update.message.reply_text(
-            msg, parse_mode="HTML", reply_markup=main_menu_with_back_keyboard()
+            msg,
+            parse_mode="HTML",
+            reply_markup=main_menu_with_back_keyboard(),
         )
         return
 
     # --- РАСПИСАНИЕ ---
     if text == "Расписание":
         log_event(user, "Расписание")
+        caption = (
+            "актуальное расписание всегда появляется в нашем Telegram-канале:\n"
+            '<a href="https://t.me/HarvestYouth">перейти в канал</a>\n\n'
+            "каждый понедельник в нём выходит свежая инфа на всю неделю!"
+        )
 
-        # Пытаемся взять последнее расписание из канала
-        data = load_schedule()
-        if data:
-            try:
-                # Копируем пост из канала пользователю
-                await context.bot.copy_message(
-                    chat_id=update.effective_chat.id,
-                    from_chat_id=data["chat_id"],
-                    message_id=data["message_id"],
-                )
-                return
-            except Exception as e:
-                print("Ошибка копирования расписания:", e)
-
-        # Если нет сохранённого расписания или ошибка — запасной вариант
-        try:
-            await update.message.reply_photo(
-                photo=open("time.jpg", "rb"),
-                caption=(
-                    "актуальное расписание всегда появляется в нашем Telegram-канале:\n"
-                    '<a href="https://t.me/HarvestYouth">перейти в канал</a>\n\n'
-                    "каждый понедельник в нём выходит свежая инфа на всю неделю!"
-                ),
-                parse_mode="HTML",
-                reply_markup=main_menu_with_back_keyboard(),
-            )
-        except Exception:
+        ok = await safe_reply_photo(
+            update,
+            "time.jpg",
+            caption=caption,
+            parse_mode="HTML",
+            reply_markup=main_menu_with_back_keyboard(),
+        )
+        if not ok:
             await update.message.reply_text(
-                'актуальное расписание: <a href="https://t.me/HarvestYouth">наш канал</a>',
+                caption,
                 parse_mode="HTML",
                 reply_markup=main_menu_with_back_keyboard(),
             )
@@ -217,13 +195,13 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "мы всегда открыты для диалога, молитвы и общения."
         )
 
-        try:
-            await update.message.reply_photo(
-                photo=open("main.jpg", "rb"),
-                caption=intro,
-                reply_markup=features_menu_keyboard(),
-            )
-        except Exception:
+        ok = await safe_reply_photo(
+            update,
+            "main.jpg",
+            caption=intro,
+            reply_markup=features_menu_keyboard(),
+        )
+        if not ok:
             await update.message.reply_text(intro, reply_markup=features_menu_keyboard())
         return
 
@@ -237,16 +215,18 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             '<a href="https://forms.yandex.ru/u/68e0b0bb50569060a96e8d2c">хочу служить!</a>'
         )
 
-        try:
-            await update.message.reply_photo(
-                photo=open("volonter.jpg", "rb"),
-                caption=caption,
+        ok = await safe_reply_photo(
+            update,
+            "volonter.jpg",
+            caption=caption,
+            parse_mode="HTML",
+            reply_markup=features_menu_keyboard(),
+        )
+        if not ok:
+            await update.message.reply_text(
+                caption,
                 parse_mode="HTML",
                 reply_markup=features_menu_keyboard(),
-            )
-        except Exception:
-            await update.message.reply_text(
-                caption, parse_mode="HTML", reply_markup=features_menu_keyboard()
             )
         return
 
@@ -260,20 +240,22 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             '<a href="https://forms.yandex.ru/u/6938307f1f1eb5cddcef1b93">найти домашку</a>'
         )
 
-        try:
-            await update.message.reply_photo(
-                photo=open("homegroup.jpg", "rb"),
-                caption=caption,
+        ok = await safe_reply_photo(
+            update,
+            "homegroup.jpg",
+            caption=caption,
+            parse_mode="HTML",
+            reply_markup=features_menu_keyboard(),
+        )
+        if not ok:
+            await update.message.reply_text(
+                caption,
                 parse_mode="HTML",
                 reply_markup=features_menu_keyboard(),
             )
-        except Exception:
-            await update.message.reply_text(
-                caption, parse_mode="HTML", reply_markup=features_menu_keyboard()
-            )
         return
 
-    # --- ЗАДАТЬ ВОПРОС / ПРЕДЛОЖЕНИЕ ---
+    # --- ОБРАТНАЯ СВЯЗЬ ---
     if text == "Задать вопрос / предложение":
         log_event(user, "Задать вопрос / предложение")
         caption = (
@@ -285,14 +267,14 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             '<a href="https://forms.yandex.ru/u/693838eb49af47b74be7c00e">написать сообщение!</a>'
         )
 
-        try:
-            await update.message.reply_photo(
-                photo=open("feedback.jpg", "rb"),
-                caption=caption,
-                parse_mode="HTML",
-                reply_markup=features_menu_keyboard(),
-            )
-        except Exception:
+        ok = await safe_reply_photo(
+            update,
+            "feedback.jpg",
+            caption=caption,
+            parse_mode="HTML",
+            reply_markup=features_menu_keyboard(),
+        )
+        if not ok:
             await update.message.reply_text(
                 caption,
                 parse_mode="HTML",
@@ -310,16 +292,18 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             '<a href="https://forms.yandex.ru/u/68446f8c505690a7125513ca">отправить молитвенную нужду!</a>'
         )
 
-        try:
-            await update.message.reply_photo(
-                photo=open("prays.jpg", "rb"),
-                caption=caption,
+        ok = await safe_reply_photo(
+            update,
+            "prays.jpg",
+            caption=caption,
+            parse_mode="HTML",
+            reply_markup=features_menu_keyboard(),
+        )
+        if not ok:
+            await update.message.reply_text(
+                caption,
                 parse_mode="HTML",
                 reply_markup=features_menu_keyboard(),
-            )
-        except Exception:
-            await update.message.reply_text(
-                caption, parse_mode="HTML", reply_markup=features_menu_keyboard()
             )
         return
 
@@ -331,16 +315,14 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
-# === ЗАПУСК БОТА ===
+# === ЗАПУСК ===
 
 def main():
-    app = ApplicationBuilder().token(TOKEN).build()
+    if not TOKEN:
+        raise RuntimeError("Переменная окружения TOKEN не задана!")
 
-    # /start
+    app = ApplicationBuilder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
-    # посты в канале (бот должен быть админом канала)
-    app.add_handler(MessageHandler(filters.ChatType.CHANNEL, handle_channel_post))
-    # личка/чаты
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
 
     print("Бот запущен. Нажми Ctrl+C, чтобы остановить.")

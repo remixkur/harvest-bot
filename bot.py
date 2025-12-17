@@ -481,7 +481,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # --- ЕСЛИ НЕ ПОНЯЛ ---
     log_event(user, f"непонятный ввод: {text}")
     await update.message.reply_text(
-        "Не понял тебя. Выбери, пожалуйста, пункт в меню ниже.",
+        "не понял тебя, давай ты просто выберешь пункт в меню ниже.",
         reply_markup=main_menu_keyboard(),
     )
 

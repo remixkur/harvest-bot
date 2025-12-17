@@ -2,8 +2,9 @@ from telegram import (
     Update,
     ReplyKeyboardMarkup,
     KeyboardButton,
-    InlineKeyboardMarkup,
     InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    InputMediaPhoto,
 )
 from telegram.ext import (
     ApplicationBuilder,
@@ -13,114 +14,119 @@ from telegram.ext import (
     ContextTypes,
     filters,
 )
+
 from datetime import datetime
 import csv
 import os
-from pathlib import Path
 
+# =========================
+# НАСТРОЙКИ
+# =========================
 
-# ====== НАСТРОЙКИ ======
-TOKEN = os.getenv("TOKEN")
+TOKEN = os.getenv("TOKEN")  # токен хранится в переменных окружения
 if not TOKEN:
-    raise RuntimeError("TOKEN env var is not set")
+    raise RuntimeError("TOKEN env var is missing. Set TOKEN in environment.")
 
-# Папка, где лежит bot.py и все картинки
-BASE_DIR = Path(__file__).resolve().parent
-STATS_FILE = BASE_DIR / "stats.csv"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# Ссылка на заявку (одна на всех)
-APPLY_URL = "https://forms.yandex.ru/u/68e0b0bb50569060a96e8d2c"
+def file_path(name: str) -> str:
+    return os.path.join(BASE_DIR, name)
 
+# Ссылка на заявку (одна на всех слайдах)
+SERVE_FORM_URL = "https://forms.yandex.ru/u/68e0b0bb50569060a96e8d2c"
 
-# ====== СЛАЙДЫ СЛУЖЕНИЙ (первый — вступление) ======
-MINISTRIES = [
+# Слайды "Хочу служить" (0 = вступление)
+SERVE_SLIDES = [
     {
-        "title": "Хочу служить",
+        "title": "ХОЧУ СЛУЖИТЬ",
         "text": (
-            "здесь ты найдешь все команды и служения, которые делают одно большое дело.\n"
+            "здесь ты найдешь все команды и служения, которые делают одно большое дело. "
             "перелистывай через кнопки снизу, чтобы посмотреть их все.\n\n"
-            "если ты хочешь служить вместе с нами, выбери команду, которая запала в сердце,\n"
+            "если ты хочешь служить вместе с нами, выбери команду, которая запала в сердце, "
             "нажми на кнопку «Оставить заявку», и мы свяжемся с тобой"
         ),
         "image": "team.jpg",
+        "has_apply": True,
     },
     {
         "title": "Продакшн",
         "text": (
-            "продакшн — это всё, что происходит за кадром.\n"
-            "прямые трансляции, камеры, свет, экраны и видео для богослужений.\n"
-            "команда, которая делает служение живым, чётким и современным.\n\n"
-            "Если тебе близки камеры, съёмка, свет, экраны\n"
-            "или ты хочешь научиться работать с техникой и видео —\n"
+            "продакшн — это всё, что происходит за кадром. прямые трансляции, камеры, свет, "
+            "экраны и видео для богослужений. команда, которая делает служение живым, чётким и современным.\n\n"
+            "если тебе близки камеры, съёмка, свет, экраны или ты хочешь научиться работать с техникой и видео — "
             "тебе в продакшн."
         ),
         "image": "media.jpg",
+        "has_apply": True,
     },
     {
         "title": "Прославление",
         "text": (
-            "команда прославления — это про поклонение Богу через музыку.\n"
-            "Музыканты и вокалисты, которые ведут церковь в поклонении и создают атмосферу, где Бог в центре.\n\n"
-            "Если ты играешь на инструменте, поёшь\n"
-            "или хочешь развивать свой музыкальный дар для Бога —\n"
+            "команда прославления — это про поклонение Богу через музыку. музыканты и вокалисты, "
+            "которые ведут церковь в поклонении и создают атмосферу, где Бог в центре.\n\n"
+            "если ты играешь на инструменте, поёшь или хочешь развивать свой музыкальный дар для Бога — "
             "присоединяйся к команде прославления."
         ),
         "image": "praise.jpg",
+        "has_apply": True,
     },
     {
         "title": "Команда порядка",
         "text": (
-            "команда порядка — это те, кто создают комфорт на служении.\n"
-            "Они встречают людей у входа, помогают сориентироваться, следят за порядком в зале, гардеробом и подготовкой пространства.\n"
-            "Именно через них люди чувствуют заботу и внимание с первых минут.\n\n"
-            "если тебе откликается встречать людей, помогать и служить делом —\n"
-            "добро пожаловать в команду порядка."
+            "команда порядка — это те, кто создают комфорт на служении. они встречают людей у входа, "
+            "помогают сориентироваться, следят за порядком в зале, гардеробом и подготовкой пространства. "
+            "именно через них люди чувствуют заботу и внимание с первых минут.\n\n"
+            "если тебе откликается встречать людей, помогать и служить делом — добро пожаловать в команду порядка."
         ),
         "image": "poryadok.jpg",
+        "has_apply": True,
     },
     {
         "title": "Хозяюшки",
         "text": (
-            "хозяюшки — это служение заботы и тепла.\n"
-            "ребята, которые готовят еду к молодёжке и создают атмосферу дома, где хочется остаться, пообщаться и быть своим.\n"
-            "Через простые вещи они показывают любовь и внимание к каждому.\n\n"
-            "Если тебе нравится готовить, заботиться о людях\n"
-            "и служить через практичные дела —\n"
-            "тебе в служение хозяюшек."
+            "хозяюшки — это служение заботы и тепла. ребята, которые готовят еду к молодёжке и создают атмосферу дома, "
+            "где хочется остаться, пообщаться и быть своим. через простые вещи они показывают любовь и внимание к каждому.\n\n"
+            "если тебе нравится готовить, заботиться о людях и служить через практичные дела — тебе в служение хозяюшек."
         ),
         "image": "eda.jpg",
+        "has_apply": True,
     },
     {
         "title": "SMM",
         "text": (
-            "SMM — это всё, что ты видишь в соцсетях молодёжки.\n"
-            "Рилсы и короткие видео, тексты, идеи для постов, дизайн и визуал.\n"
-            "Команда, которая показывает жизнь церкви онлайн и помогает людям узнать о нас ещё до первого визита.\n\n"
-            "Если тебе близки соцсети, съёмка рилсов, написание текстов, дизайн\n"
-            "или просто есть идеи, которые хочется реализовать —\n"
+            "SMM — это всё, что ты видишь в соцсетях молодёжки. рилсы и короткие видео, тексты, идеи для постов, "
+            "дизайн и визуал. команда, которая показывает жизнь церкви онлайн и помогает людям узнать о нас ещё до первого визита.\n\n"
+            "если тебе близки соцсети, съёмка рилсов, написание текстов, дизайн или просто есть идеи, которые хочется реализовать — "
             "присоединяйся к SMM-команде."
         ),
         "image": "smm.jpg",
+        "has_apply": True,
     },
     {
         "title": "Евангелизация",
         "text": (
-            "Евангелизация — это выход за стены церкви.\n"
-            "Мы выходим на улицы города и рассказываем о Боге через творчество, общение и живые проекты.\n"
-            "Музыка, перфомансы, диалоги — всё, чтобы делиться Евангелием простым и понятным языком.\n\n"
-            "Если тебе важно, чтобы люди узнавали о Боге\n"
-            "и ты готов выходить к людям и быть светом там, где ты есть —\n"
+            "евангелизация — это выход за стены церкви. мы выходим на улицы города и рассказываем о Боге через творчество, "
+            "общение и живые проекты. музыка, перфомансы, диалоги — всё, чтобы делиться Евангелием простым и понятным языком.\n\n"
+            "если тебе важно, чтобы люди узнавали о Боге, и ты готов выходить к людям и быть светом там, где ты есть — "
             "присоединяйся к служению евангелизации."
         ),
         "image": "Jesus.jpg",
+        "has_apply": True,
     },
 ]
 
 
-# ====== ЛОГ СТАТИСТИКИ ======
+# =========================
+# СТАТИСТИКА
+# =========================
+
 def log_event(user, action: str):
+    """
+    Пишем строку в stats.csv:
+    время; id; username; имя; действие
+    """
     try:
-        with open(STATS_FILE, "a", newline="", encoding="utf-8") as f:
+        with open(file_path("stats.csv"), "a", newline="", encoding="utf-8") as f:
             writer = csv.writer(f, delimiter=";")
             writer.writerow([
                 datetime.now().isoformat(timespec="seconds"),
@@ -133,7 +139,10 @@ def log_event(user, action: str):
         print("Ошибка записи статистики:", e)
 
 
-# ====== КЛАВИАТУРЫ ======
+# =========================
+# КЛАВИАТУРЫ
+# =========================
+
 def main_menu_keyboard() -> ReplyKeyboardMarkup:
     buttons = [
         [KeyboardButton("Расписание")],
@@ -159,137 +168,180 @@ def features_menu_keyboard() -> ReplyKeyboardMarkup:
     ]
     return ReplyKeyboardMarkup(buttons, resize_keyboard=True)
 
+def serve_inline_keyboard(index: int) -> InlineKeyboardMarkup:
+    total = len(SERVE_SLIDES)
+    prev_i = (index - 1) % total
+    next_i = (index + 1) % total
 
-# ====== ВСПОМОГАТЕЛЬНОЕ: безопасно открыть картинку ======
-def img_path(filename: str) -> Path:
-    return BASE_DIR / filename
+    row_nav = [
+        InlineKeyboardButton("◀", callback_data=f"serve:goto:{prev_i}"),
+        InlineKeyboardButton(f"{index+1}/{total}", callback_data="serve:noop"),
+        InlineKeyboardButton("▶", callback_data=f"serve:goto:{next_i}"),
+    ]
+
+    rows = [row_nav]
+
+    # Кнопка заявки на каждом слайде
+    if SERVE_SLIDES[index].get("has_apply"):
+        rows.append([InlineKeyboardButton("Оставить заявку", url=SERVE_FORM_URL)])
+
+    # Назад (выйти из листалки)
+    rows.append([InlineKeyboardButton("Назад", callback_data="serve:exit")])
+
+    return InlineKeyboardMarkup(rows)
 
 
-# ====== СТАРТОВЫЙ ЭКРАН ======
+# =========================
+# ЭКРАН СТАРТА
+# =========================
+
 async def send_start_screen(update: Update):
     user = update.message.from_user
     log_event(user, "start_screen")
 
-    photo_file = img_path("welcome.jpg")
-    caption = (
-        'привет! давай знакомиться?\n\n'
-        '• это бот молодежного служения Церковь "Жатвы", г. Курган.\n'
-        'если хочешь узнать о нас больше — заходи в тг-канал:\n'
-        '<a href="https://t.me/HarvestYouth">HarvestYouth</a>\n\n'
-        '• каждое воскресенье в 14:30 я жду тебя по адресу:\n'
-        '<a href="https://yandex.ru/maps/-/CLseE4oL">Курган, ул. Техническая, д. 8</a>\n\n'
-        '• если ты пришел на молодежку первый раз — обязательно напиши:\n'
-        '@romanmurash, будем на связи'
+    await update.message.reply_photo(
+        photo=open(file_path("welcome.jpg"), "rb"),
+        caption=(
+            'привет! давай знакомиться?\n\n'
+            '• это бот молодежного служения Церковь "Жатвы", г. Курган.\n'
+            'если хочешь узнать о нас больше — заходи в тг-канал:\n'
+            '<a href="https://t.me/HarvestYouth">HarvestYouth</a>\n\n'
+            '• каждое воскресенье в 14:30 я жду тебя по адресу:\n'
+            '<a href="https://yandex.ru/maps/-/CLseE4oL">Курган, ул. Техническая, д. 8</a>\n\n'
+            '• если ты пришел на молодежку первый раз — обязательно напиши:\n'
+            '@romanmurash, будем на связи'
+        ),
+        parse_mode="HTML",
+        reply_markup=main_menu_keyboard(),
     )
 
-    if photo_file.exists():
-        await update.message.reply_photo(
-            photo=open(photo_file, "rb"),
-            caption=caption,
-            parse_mode="HTML",
-            reply_markup=main_menu_keyboard(),
-        )
-    else:
-        await update.message.reply_text(
-            caption,
-            parse_mode="HTML",
-            reply_markup=main_menu_keyboard(),
-        )
 
+# =========================
+# /START
+# =========================
 
-# ====== /START ======
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.message.from_user
     log_event(user, "/start")
     await send_start_screen(update)
 
 
-# ====== ЛИСТАЛКА "ХОЧУ СЛУЖИТЬ" ======
-def ministries_inline_kb(index: int) -> InlineKeyboardMarkup:
-    left = InlineKeyboardButton("◀", callback_data="min:prev")
-    right = InlineKeyboardButton("▶", callback_data="min:next")
-    apply = InlineKeyboardButton("Оставить заявку", url=APPLY_URL)
-    back = InlineKeyboardButton("Назад", callback_data="min:back")
-    # стрелки + заявка + назад
-    return InlineKeyboardMarkup([[left, right], [apply], [back]])
+# =========================
+# ЛИСТАЛКА "ХОЧУ СЛУЖИТЬ"
+# =========================
 
-async def send_ministry_slide(target, context: ContextTypes.DEFAULT_TYPE, index: int):
-    index = max(0, min(index, len(MINISTRIES) - 1))
-    context.user_data["ministry_index"] = index
-
-    slide = MINISTRIES[index]
-    title = slide["title"]
-    text = slide["text"]
-    image_file = img_path(slide["image"])
-
-    caption = f"<b>{title}</b>\n\n{text}"
-    kb = ministries_inline_kb(index)
-
-    # target = update.message (Message) или query.message (Message)
-    if image_file.exists():
-        await target.reply_photo(
-            photo=open(image_file, "rb"),
-            caption=caption,
-            parse_mode="HTML",
-            reply_markup=kb,
-        )
-    else:
-        await target.reply_text(
-            caption,
-            parse_mode="HTML",
-            reply_markup=kb,
-        )
-
-async def ministries_open(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def send_serve_slide_message(update: Update, context: ContextTypes.DEFAULT_TYPE, index: int):
+    """Отправить первое сообщение листалки."""
     user = update.message.from_user
-    log_event(user, "Хочу служить (open)")
-    context.user_data["ministry_index"] = 0
-    await send_ministry_slide(update.message, context, 0)
+    log_event(user, f"serve_open:{index}")
 
-async def ministries_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    slide = SERVE_SLIDES[index]
+    caption = f"{slide['title']}\n\n{slide['text']}"
+
+    msg = await update.message.reply_photo(
+        photo=open(file_path(slide["image"]), "rb"),
+        caption=caption,
+        reply_markup=serve_inline_keyboard(index),
+    )
+
+    # сохраним, чтобы потом редактировать это сообщение, а не слать новое
+    context.user_data["serve_msg_id"] = msg.message_id
+    context.user_data["serve_chat_id"] = msg.chat_id
+    context.user_data["serve_index"] = index
+
+
+async def edit_serve_slide_message(update: Update, context: ContextTypes.DEFAULT_TYPE, index: int):
+    """Обновить текущее сообщение листалки (без новых сообщений)."""
+    query = update.callback_query
+    await query.answer()
+
+    chat_id = context.user_data.get("serve_chat_id")
+    msg_id = context.user_data.get("serve_msg_id")
+
+    # если по какой-то причине нет сохраненного msg_id — просто отправим заново
+    if not chat_id or not msg_id:
+        context.user_data["serve_index"] = index
+        return
+
+    slide = SERVE_SLIDES[index]
+    caption = f"{slide['title']}\n\n{slide['text']}"
+
+    media = InputMediaPhoto(
+        media=open(file_path(slide["image"]), "rb"),
+        caption=caption,
+    )
+
+    await context.bot.edit_message_media(
+        chat_id=chat_id,
+        message_id=msg_id,
+        media=media,
+        reply_markup=serve_inline_keyboard(index),
+    )
+
+    context.user_data["serve_index"] = index
+
+async def exit_serve_slider(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Выйти из листалки: превратим сообщение в обычный экран 'Самое главное'."""
     query = update.callback_query
     await query.answer()
 
     user = query.from_user
-    action = query.data or ""
-    idx = int(context.user_data.get("ministry_index", 0))
+    log_event(user, "serve_exit")
 
-    if action == "min:prev":
-        idx -= 1
-        if idx < 0:
-            idx = len(MINISTRIES) - 1
-        log_event(user, f"min_prev->{idx}")
-        await send_ministry_slide(query.message, context, idx)
-        return
+    chat_id = context.user_data.get("serve_chat_id")
+    msg_id = context.user_data.get("serve_msg_id")
 
-    if action == "min:next":
-        idx += 1
-        if idx >= len(MINISTRIES):
-            idx = 0
-        log_event(user, f"min_next->{idx}")
-        await send_ministry_slide(query.message, context, idx)
-        return
+    # Чистим состояние листалки
+    context.user_data.pop("serve_chat_id", None)
+    context.user_data.pop("serve_msg_id", None)
+    context.user_data.pop("serve_index", None)
 
-    if action == "min:back":
-        log_event(user, "min_back_to_menu")
-        # вернём меню "Самое главное"
-        intro = (
-            "здесь есть всё, что может быть тебе полезным, друг!\n\n"
-            "мы всегда открыты для диалога, молитвы и общения."
+    intro = (
+        "здесь есть всё, что может быть тебе полезным, друг!\n\n"
+        "мы всегда открыты для диалога, молитвы и общения."
+    )
+
+    if chat_id and msg_id:
+        media = InputMediaPhoto(
+            media=open(file_path("main.jpg"), "rb"),
+            caption=intro,
         )
-        photo_file = img_path("main.jpg")
-        if photo_file.exists():
-            await query.message.reply_photo(
-                photo=open(photo_file, "rb"),
-                caption=intro,
-                reply_markup=features_menu_keyboard(),
-            )
-        else:
-            await query.message.reply_text(intro, reply_markup=features_menu_keyboard())
+        await context.bot.edit_message_media(
+            chat_id=chat_id,
+            message_id=msg_id,
+            media=media,
+            reply_markup=None,
+        )
+    # ReplyKeyboard уже остаётся на месте (features_menu_keyboard), если пользователь пришёл оттуда.
+
+
+async def handle_callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    data = query.data or ""
+
+    # serve:goto:{index}
+    if data.startswith("serve:goto:"):
+        try:
+            index = int(data.split(":")[-1])
+        except Exception:
+            await query.answer()
+            return
+        await edit_serve_slide_message(update, context, index)
+        return
+
+    if data == "serve:exit":
+        await exit_serve_slider(update, context)
+        return
+
+    if data == "serve:noop":
+        await query.answer()
         return
 
 
-# ====== ОСНОВНОЙ ХЕНДЛЕР ТЕКСТА ======
+# =========================
+# ОСНОВНОЙ ТЕКСТОВЫЙ ХЕНДЛЕР
+# =========================
+
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = (update.message.text or "").strip()
     user = update.message.from_user
@@ -316,22 +368,20 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # --- РАСПИСАНИЕ ---
     if text == "Расписание":
         log_event(user, "Расписание")
-        photo_file = img_path("time.jpg")
-        caption = (
-            "актуальное расписание всегда появляется в нашем Telegram-канале:\n"
-            '<a href="https://t.me/HarvestYouth">перейти в канал</a>\n\n'
-            "каждый понедельник в нём выходит свежая инфа на всю неделю!"
-        )
-        if photo_file.exists():
+        try:
             await update.message.reply_photo(
-                photo=open(photo_file, "rb"),
-                caption=caption,
+                photo=open(file_path("time.jpg"), "rb"),
+                caption=(
+                    "актуальное расписание всегда появляется в нашем Telegram-канале:\n"
+                    '<a href="https://t.me/HarvestYouth">перейти в канал</a>\n\n'
+                    "каждый понедельник в нём выходит свежая инфа на всю неделю!"
+                ),
                 parse_mode="HTML",
                 reply_markup=main_menu_with_back_keyboard(),
             )
-        else:
+        except Exception:
             await update.message.reply_text(
-                caption,
+                'актуальное расписание: <a href="https://t.me/HarvestYouth">наш канал</a>',
                 parse_mode="HTML",
                 reply_markup=main_menu_with_back_keyboard(),
             )
@@ -344,20 +394,20 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "здесь есть всё, что может быть тебе полезным, друг!\n\n"
             "мы всегда открыты для диалога, молитвы и общения."
         )
-        photo_file = img_path("main.jpg")
-        if photo_file.exists():
+        try:
             await update.message.reply_photo(
-                photo=open(photo_file, "rb"),
+                photo=open(file_path("main.jpg"), "rb"),
                 caption=intro,
                 reply_markup=features_menu_keyboard(),
             )
-        else:
+        except Exception:
             await update.message.reply_text(intro, reply_markup=features_menu_keyboard())
         return
 
-    # --- ХОЧУ СЛУЖИТЬ (листалка) ---
+    # --- ХОЧУ СЛУЖИТЬ (ЛИСТАЛКА) ---
     if text == "Хочу служить":
-        await ministries_open(update, context)
+        log_event(user, "Хочу служить (slider)")
+        await send_serve_slide_message(update, context, index=0)
         return
 
     # --- НАЙТИ ДОМАШКУ ---
@@ -369,15 +419,14 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "тут поддержат, помолятся и помогут расти в вере не в одиночку!\n\n"
             '<a href="https://forms.yandex.ru/u/6938307f1f1eb5cddcef1b93">найти домашку</a>'
         )
-        photo_file = img_path("homegroup.jpg")
-        if photo_file.exists():
+        try:
             await update.message.reply_photo(
-                photo=open(photo_file, "rb"),
+                photo=open(file_path("homegroup.jpg"), "rb"),
                 caption=caption,
                 parse_mode="HTML",
                 reply_markup=features_menu_keyboard(),
             )
-        else:
+        except Exception:
             await update.message.reply_text(
                 caption, parse_mode="HTML", reply_markup=features_menu_keyboard()
             )
@@ -394,15 +443,14 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "пиши про это в форме ниже!\n"
             '<a href="https://forms.yandex.ru/u/693838eb49af47b74be7c00e">написать сообщение!</a>'
         )
-        photo_file = img_path("feedback.jpg")
-        if photo_file.exists():
+        try:
             await update.message.reply_photo(
-                photo=open(photo_file, "rb"),
+                photo=open(file_path("feedback.jpg"), "rb"),
                 caption=caption,
                 parse_mode="HTML",
                 reply_markup=features_menu_keyboard(),
             )
-        else:
+        except Exception:
             await update.message.reply_text(
                 caption, parse_mode="HTML", reply_markup=features_menu_keyboard()
             )
@@ -417,15 +465,14 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "отправь свою просьбу анонимно по ссылке ниже, наша команда за всё помолится!\n\n"
             '<a href="https://forms.yandex.ru/u/68446f8c505690a7125513ca">отправить молитвенную нужду!</a>'
         )
-        photo_file = img_path("prays.jpg")
-        if photo_file.exists():
+        try:
             await update.message.reply_photo(
-                photo=open(photo_file, "rb"),
+                photo=open(file_path("prays.jpg"), "rb"),
                 caption=caption,
                 parse_mode="HTML",
                 reply_markup=features_menu_keyboard(),
             )
-        else:
+        except Exception:
             await update.message.reply_text(
                 caption, parse_mode="HTML", reply_markup=features_menu_keyboard()
             )
@@ -439,16 +486,19 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
-# ====== ЗАПУСК ======
+# =========================
+# ЗАПУСК
+# =========================
+
 def main():
     app = ApplicationBuilder().token(TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(CallbackQueryHandler(ministries_callback, pattern=r"^min:"))
+    app.add_handler(CallbackQueryHandler(handle_callbacks))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
 
     print("Бот запущен. Нажми Ctrl+C, чтобы остановить.")
-    app.run_polling(drop_pending_updates=True)
+    app.run_polling()
 
 if __name__ == "__main__":
     main()

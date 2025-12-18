@@ -231,7 +231,7 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if data == "menu_schedule":
         await safe_edit(update, "time.jpg", (
-            "актуальное расписание всегда появляется в нашем Telegram-канале:\n"
+            "актуальное расписание на неделю всегда появляется в нашем Telegram-канале в понедельник:\n"
             '<a href="https://t.me/HarvestYouth">перейти в канал</a>'
         ), kb_back_main())
         return
@@ -239,7 +239,7 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data == "menu_features":
         await safe_edit(update, "main.jpg", (
             "здесь есть всё, что может быть тебе полезным, друг!\n\n"
-            "мы всегда открыты для диалога, молитвы и общения."
+            "мы всегда открыты для диалога, молитвы и общения"
         ), kb_features())
         return
 

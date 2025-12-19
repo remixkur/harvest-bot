@@ -190,7 +190,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     log_event(user, "/start")
 
     caption = (
-        'привет! давай знакомиться?\n\n'
+        'привет, давай знакомиться!\n\n'
         '• это бот молодежного служения Церковь "Жатвы", г. Курган.\n'
         'если хочешь узнать о нас больше — заходи в тг-канал:\n'
         '<a href="https://t.me/HarvestYouth">HarvestYouth</a>\n\n'

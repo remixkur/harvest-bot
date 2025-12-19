@@ -60,6 +60,7 @@ def kb_features():
         [InlineKeyboardButton("Задать вопрос / предложение", callback_data="feat_feedback")],
         [InlineKeyboardButton("Найти домашку", callback_data="feat_homegroup")],
         [InlineKeyboardButton("Молитвенная поддержка", callback_data="feat_prays")],
+        [InlineKeyboardButton("Пожертвование", callback_data="feat_finance")],
         [InlineKeyboardButton("Назад", callback_data="back_main")],
     ])
 
@@ -210,7 +211,7 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if data == "back_main":
-        await safe_edit(update, "welcome.jpg", start_caption := (
+        await safe_edit(update, "welcome.jpg", (
             'привет! давай знакомиться?\n\n'
             '• это бот молодежного служения Церковь "Жатвы", г. Курган.\n'
             'если хочешь узнать о нас больше — заходи в тг-канал:\n'
@@ -286,6 +287,21 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await safe_edit(update, "prays.jpg", (
             "молитвенная поддержка — это Божья атмосфера помощи и единства!\n\n"
             '<a href="https://forms.yandex.ru/u/68446f8c505690a7125513ca">отправить молитвенную нужду!</a>'
+        ), kb_back_features())
+        return
+
+    if data == "feat_finance":
+        await safe_edit(update, "finance.jpg", (
+            "Бог доверил тебе многое: не только финансы, но и время, способности, силы.\n"
+            "всё это — ресурсы, через которые можно служить людям, делать добро и быть частью Божьего дела.\n"
+            "щедрость — это не про обязанность, а про сердце, готовое откликаться!\n\n"
+            "<blockquote>"
+            "«Не собирайте себе сокровищ на земле, где моль и ржа истребляют и где воры подкапывают и крадут; "
+            "но собирайте себе сокровища на небе, где ни моль, ни ржа не истребляют и где воры не подкапывают и не крадут»\n"
+            "(Евангелие от Матфея 6:19–20)"
+            "</blockquote>\n\n"
+            "давайте вместе вкладываться в то, что имеет вечную ценность — в основание, которое не исчезнет и не сгорит.\n"
+            "спасибо за твои пожертвования!"
         ), kb_back_features())
         return
 

@@ -71,6 +71,16 @@ def kb_back_features():
     ])
 
 
+def kb_finance():
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton(
+            "Пожертвовать",
+            url="https://qr.nspk.ru/AS1A005HCS949R4298Q9Q6UM6NJREQK6?type=01&bank=100000000008&crc=8435"
+        )],
+        [InlineKeyboardButton("Назад", callback_data="back_features")],
+    ])
+
+
 # =========================
 # СЛУЖЕНИЯ (ЛИСТАЛКА)
 # =========================
@@ -302,7 +312,7 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "</blockquote>\n\n"
             "давайте вместе вкладываться в то, что имеет вечную ценность — в основание, которое не исчезнет и не сгорит.\n"
             "спасибо за твои пожертвования!"
-        ), kb_back_features())
+        ), kb_finance())
         return
 
 

@@ -17,14 +17,49 @@ from telegram.ext import (
     filters,
 )
 
-TOKEN = os.getenv("TOKEN")
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+TOKEN_ENV_NAMES = ("TOKEN", "TELEGRAM_BOT_TOKEN", "BOT_TOKEN")
+
+
+def file_path(file_name: str) -> str:
+    return os.path.join(BASE_DIR, file_name)
+
+
+def load_token():
+    for env_name in TOKEN_ENV_NAMES:
+        token = os.getenv(env_name)
+        if token and token.strip():
+            return token.strip()
+
+    env_path = file_path(".env")
+    try:
+        with open(env_path, encoding="utf-8") as f:
+            for raw_line in f:
+                line = raw_line.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+
+                key, value = line.split("=", 1)
+                if key.strip() in TOKEN_ENV_NAMES:
+                    token = value.strip().strip('"').strip("'")
+                    if token:
+                        return token
+    except FileNotFoundError:
+        pass
+    except Exception as e:
+        print("Ошибка чтения .env:", e)
+
+    return None
+
+
+TOKEN = load_token()
 
 # =========================
 # ЛОГ СТАТИСТИКИ
 # =========================
 def log_event(user, action: str):
     try:
-        with open("stats.csv", "a", newline="", encoding="utf-8") as f:
+        with open(file_path("stats.csv"), "a", newline="", encoding="utf-8") as f:
             writer = csv.writer(f, delimiter=";")
             writer.writerow([
                 datetime.now().isoformat(timespec="seconds"),
@@ -159,27 +194,49 @@ def kb_serve(index: int):
 # =========================
 # УТИЛИТА РЕДАКТИРОВАНИЯ
 # =========================
+async def send_text(message, caption, keyboard):
+    try:
+        await message.reply_text(
+            caption,
+            parse_mode="HTML",
+            reply_markup=keyboard,
+        )
+    except Exception as e:
+        print("TEXT SEND FAILED:", e)
+        await message.reply_text(caption, reply_markup=keyboard)
+
+
+async def send_photo(message, image, caption, keyboard):
+    try:
+        with open(file_path(image), "rb") as photo:
+            await message.reply_photo(
+                photo=photo,
+                caption=caption,
+                parse_mode="HTML",
+                reply_markup=keyboard,
+            )
+    except Exception as e:
+        print(f"PHOTO SEND FAILED ({image}) -> TEXT:", e)
+        await send_text(message, caption, keyboard)
+
+
 async def safe_edit(update, image, caption, keyboard):
     q = update.callback_query
     await q.answer(cache_time=1)
 
     try:
-        await q.message.edit_media(
-            media=InputMediaPhoto(
-                media=open(image, "rb"),
-                caption=caption,
-                parse_mode="HTML",
-            ),
-            reply_markup=keyboard,
-        )
+        with open(file_path(image), "rb") as photo:
+            await q.message.edit_media(
+                media=InputMediaPhoto(
+                    media=photo,
+                    caption=caption,
+                    parse_mode="HTML",
+                ),
+                reply_markup=keyboard,
+            )
     except Exception as e:
         print("EDIT FAILED → SEND NEW:", e)
-        await q.message.reply_photo(
-            photo=open(image, "rb"),
-            caption=caption,
-            parse_mode="HTML",
-            reply_markup=keyboard,
-        )
+        await send_photo(q.message, image, caption, keyboard)
 
 
 # =========================
@@ -200,12 +257,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         '@romanmurash, будем на связи'
     )
 
-    await update.message.reply_photo(
-        photo=open("welcome.jpg", "rb"),
-        caption=caption,
-        parse_mode="HTML",
-        reply_markup=kb_main(),
-    )
+    await send_photo(update.message, "welcome.jpg", caption, kb_main())
 
 
 # =========================
@@ -321,6 +373,13 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 def main():
+    if not TOKEN:
+        raise RuntimeError(
+            "Не найден токен Telegram-бота. "
+            "Задай TOKEN, TELEGRAM_BOT_TOKEN или BOT_TOKEN в окружении сервера "
+            "либо положи .env рядом с bot.py."
+        )
+
     app = ApplicationBuilder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CallbackQueryHandler(on_callback))

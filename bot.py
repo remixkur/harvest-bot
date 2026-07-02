@@ -439,6 +439,10 @@ def main():
         .read_timeout(30)
         .write_timeout(30)
         .pool_timeout(30)
+        .get_updates_connect_timeout(30)
+        .get_updates_read_timeout(20)
+        .get_updates_write_timeout(30)
+        .get_updates_pool_timeout(30)
         .build()
     )
     app.add_handler(CommandHandler("start", start))
@@ -447,7 +451,11 @@ def main():
     app.add_error_handler(on_error)
 
     logger.info("Бот запускается")
-    app.run_polling(drop_pending_updates=True)
+    app.run_polling(
+        poll_interval=1.0,
+        timeout=5,
+        drop_pending_updates=True,
+    )
 
 
 if __name__ == "__main__":

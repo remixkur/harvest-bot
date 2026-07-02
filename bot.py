@@ -217,6 +217,10 @@ def kb_serve(index: int):
 # УТИЛИТА РЕДАКТИРОВАНИЯ
 # =========================
 async def send_text(message, caption, keyboard):
+    if message is None:
+        logger.error("TEXT SEND SKIPPED: message is None")
+        return
+
     try:
         await message.reply_text(
             caption,
@@ -229,6 +233,10 @@ async def send_text(message, caption, keyboard):
 
 
 async def send_photo(message, image, caption, keyboard):
+    if message is None:
+        logger.error("PHOTO SEND SKIPPED (%s): message is None", image)
+        return
+
     try:
         with open(file_path(image), "rb") as photo:
             await message.reply_photo(
@@ -270,6 +278,7 @@ async def safe_edit(update, image, caption, keyboard):
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     log_event(user, "/start")
+    message = update.effective_message
 
     caption = (
         'привет, давай знакомиться!\n\n'
@@ -282,7 +291,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         '@romanmurash, будем на связи'
     )
 
-    await send_photo(update.message, "welcome.jpg", caption, kb_main())
+    await send_photo(message, "welcome.jpg", caption, kb_main())
 
 
 # =========================
@@ -394,7 +403,12 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Используй кнопки меню 🙂")
+    message = update.effective_message
+    if message is None:
+        logger.warning("TEXT UPDATE WITHOUT MESSAGE: %s", update)
+        return
+
+    await message.reply_text("Используй кнопки меню 🙂")
 
 
 async def on_error(update: object, context: ContextTypes.DEFAULT_TYPE):
@@ -416,7 +430,15 @@ def main():
             "либо положи .env рядом с bot.py."
         )
 
-    app = ApplicationBuilder().token(TOKEN).build()
+    app = (
+        ApplicationBuilder()
+        .token(TOKEN)
+        .connect_timeout(30)
+        .read_timeout(30)
+        .write_timeout(30)
+        .pool_timeout(30)
+        .build()
+    )
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CallbackQueryHandler(on_callback))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))

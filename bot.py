@@ -23,6 +23,8 @@ logging.basicConfig(
     level=logging.INFO,
 )
 logger = logging.getLogger(__name__)
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 TOKEN_ENV_NAMES = ("TOKEN", "TELEGRAM_BOT_TOKEN", "BOT_TOKEN")

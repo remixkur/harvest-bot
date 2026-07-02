@@ -1,5 +1,6 @@
 import os
 import csv
+import logging
 from datetime import datetime
 
 from telegram import (
@@ -17,8 +18,15 @@ from telegram.ext import (
     filters,
 )
 
+logging.basicConfig(
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    level=logging.INFO,
+)
+logger = logging.getLogger(__name__)
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 TOKEN_ENV_NAMES = ("TOKEN", "TELEGRAM_BOT_TOKEN", "BOT_TOKEN")
+ENV_FILE_NAMES = (".env", ".env.local", "bot.env")
 
 
 def file_path(file_name: str) -> str:
@@ -31,23 +39,37 @@ def load_token():
         if token and token.strip():
             return token.strip()
 
-    env_path = file_path(".env")
-    try:
-        with open(env_path, encoding="utf-8") as f:
-            for raw_line in f:
-                line = raw_line.strip()
-                if not line or line.startswith("#") or "=" not in line:
-                    continue
+    for env_file_name in ENV_FILE_NAMES:
+        env_path = file_path(env_file_name)
+        try:
+            with open(env_path, encoding="utf-8") as f:
+                for raw_line in f:
+                    line = raw_line.strip()
+                    if line.startswith("export "):
+                        line = line[len("export "):].strip()
+                    if not line or line.startswith("#") or "=" not in line:
+                        continue
 
-                key, value = line.split("=", 1)
-                if key.strip() in TOKEN_ENV_NAMES:
-                    token = value.strip().strip('"').strip("'")
-                    if token:
-                        return token
+                    key, value = line.split("=", 1)
+                    if key.strip() in TOKEN_ENV_NAMES:
+                        token = value.strip().strip('"').strip("'")
+                        if token:
+                            return token
+        except FileNotFoundError:
+            pass
+        except Exception:
+            logger.exception("Ошибка чтения %s", env_file_name)
+
+    token_path = file_path("token.txt")
+    try:
+        with open(token_path, encoding="utf-8") as f:
+            token = f.read().strip().strip('"').strip("'")
+            if token:
+                return token
     except FileNotFoundError:
         pass
-    except Exception as e:
-        print("Ошибка чтения .env:", e)
+    except Exception:
+        logger.exception("Ошибка чтения token.txt")
 
     return None
 
@@ -68,8 +90,8 @@ def log_event(user, action: str):
                 f"{user.first_name or ''} {user.last_name or ''}".strip(),
                 action,
             ])
-    except Exception as e:
-        print("Ошибка записи статистики:", e)
+    except Exception:
+        logger.exception("Ошибка записи статистики")
 
 
 # =========================
@@ -201,8 +223,8 @@ async def send_text(message, caption, keyboard):
             parse_mode="HTML",
             reply_markup=keyboard,
         )
-    except Exception as e:
-        print("TEXT SEND FAILED:", e)
+    except Exception:
+        logger.exception("TEXT SEND FAILED")
         await message.reply_text(caption, reply_markup=keyboard)
 
 
@@ -215,14 +237,17 @@ async def send_photo(message, image, caption, keyboard):
                 parse_mode="HTML",
                 reply_markup=keyboard,
             )
-    except Exception as e:
-        print(f"PHOTO SEND FAILED ({image}) -> TEXT:", e)
+    except Exception:
+        logger.exception("PHOTO SEND FAILED (%s) -> TEXT", image)
         await send_text(message, caption, keyboard)
 
 
 async def safe_edit(update, image, caption, keyboard):
     q = update.callback_query
-    await q.answer(cache_time=1)
+    try:
+        await q.answer(cache_time=1)
+    except Exception:
+        logger.exception("CALLBACK ANSWER FAILED")
 
     try:
         with open(file_path(image), "rb") as photo:
@@ -234,8 +259,8 @@ async def safe_edit(update, image, caption, keyboard):
                 ),
                 reply_markup=keyboard,
             )
-    except Exception as e:
-        print("EDIT FAILED → SEND NEW:", e)
+    except Exception:
+        logger.exception("EDIT FAILED -> SEND NEW")
         await send_photo(q.message, image, caption, keyboard)
 
 
@@ -372,6 +397,17 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Используй кнопки меню 🙂")
 
 
+async def on_error(update: object, context: ContextTypes.DEFAULT_TYPE):
+    error = context.error
+    if isinstance(error, BaseException):
+        logger.error(
+            "UNHANDLED BOT ERROR",
+            exc_info=(type(error), error, error.__traceback__),
+        )
+    else:
+        logger.error("UNHANDLED BOT ERROR: %s", error)
+
+
 def main():
     if not TOKEN:
         raise RuntimeError(
@@ -384,7 +420,10 @@ def main():
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CallbackQueryHandler(on_callback))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
-    app.run_polling()
+    app.add_error_handler(on_error)
+
+    logger.info("Бот запускается")
+    app.run_polling(drop_pending_updates=True)
 
 
 if __name__ == "__main__":

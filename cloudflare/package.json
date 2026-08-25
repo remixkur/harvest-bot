@@ -10,7 +10,7 @@
     "db:migrate": "wrangler d1 migrations apply harvest-youth-bot --remote"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20260820.0",
+    "@cloudflare/workers-types": "latest",
     "typescript": "^5.9.2",
     "wrangler": "^4.30.0"
   }

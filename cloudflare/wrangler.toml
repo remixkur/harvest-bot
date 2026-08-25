@@ -1,0 +1,13 @@
+name = "harvest-youth-bot"
+main = "src/index.ts"
+compatibility_date = "2026-08-01"
+workers_dev = true
+
+[vars]
+ASSET_BASE_URL = "https://raw.githubusercontent.com/remixkur/harvest-bot/main"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "harvest-youth-bot"
+database_id = "REPLACE_WITH_D1_DATABASE_ID"
+migrations_dir = "migrations"

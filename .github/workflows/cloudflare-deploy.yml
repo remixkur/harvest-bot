@@ -44,8 +44,9 @@ jobs:
           npx wrangler d1 list --json > /tmp/d1-list.json
           DB_ID=$(node -e 'const fs=require("fs");const rows=JSON.parse(fs.readFileSync("/tmp/d1-list.json","utf8"));const db=rows.find(x=>x.name==="harvest-youth-bot");if(db)process.stdout.write(db.uuid||db.id)')
           if [ -z "$DB_ID" ]; then
-            npx wrangler d1 create harvest-youth-bot --json > /tmp/d1-create.json
-            DB_ID=$(node -e 'const fs=require("fs");const x=JSON.parse(fs.readFileSync("/tmp/d1-create.json","utf8"));process.stdout.write(x.uuid||x.id||x.database_id)')
+            npx wrangler d1 create harvest-youth-bot --location eeur
+            npx wrangler d1 list --json > /tmp/d1-list.json
+            DB_ID=$(node -e 'const fs=require("fs");const rows=JSON.parse(fs.readFileSync("/tmp/d1-list.json","utf8"));const db=rows.find(x=>x.name==="harvest-youth-bot");if(db)process.stdout.write(db.uuid||db.id)')
           fi
           test -n "$DB_ID"
           node -e 'const fs=require("fs");const p="wrangler.toml";const id=process.argv[1];fs.writeFileSync(p,fs.readFileSync(p,"utf8").replace("REPLACE_WITH_D1_DATABASE_ID",id))' "$DB_ID"

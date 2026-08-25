@@ -9,5 +9,5 @@ ASSET_BASE_URL = "https://raw.githubusercontent.com/remixkur/harvest-bot/main"
 [[d1_databases]]
 binding = "DB"
 database_name = "harvest-youth-bot"
-database_id = "REPLACE_WITH_D1_DATABASE_ID"
+database_id = "7826755f-820c-4990-82c2-d6269601fb08"
 migrations_dir = "migrations"

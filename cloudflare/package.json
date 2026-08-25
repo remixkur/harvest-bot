@@ -1,0 +1,17 @@
+{
+  "name": "harvest-youth-telegram-worker",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "check": "tsc --noEmit",
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "db:create": "wrangler d1 create harvest-youth-bot",
+    "db:migrate": "wrangler d1 migrations apply harvest-youth-bot --remote"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "latest",
+    "typescript": "^5.9.2",
+    "wrangler": "^4.30.0"
+  }
+}

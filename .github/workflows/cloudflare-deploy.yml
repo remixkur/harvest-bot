@@ -2,6 +2,11 @@ name: Deploy bot to Cloudflare
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "cloudflare/.deploy-trigger"
 
 permissions:
   contents: read

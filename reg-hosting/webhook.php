@@ -318,6 +318,7 @@ function flowTitle(string $flow): string
         'serve' => '🙌 Хочу служить',
         'homegroup' => '🏠 Найти домашку',
         'feedback' => '💬 Вопрос / предложение',
+        'prayer' => '🙏 Молитвенная нужда',
         default => 'Новая заявка',
     };
 }
@@ -352,7 +353,8 @@ function submitApplication(array $config, string $storageDir, array $user, array
         $lines[] = '<b>Район:</b> ' . html((string) $data['district']);
     }
     if (isset($data['message'])) {
-        $lines[] = '<b>Сообщение:</b>' . "\n" . html((string) $data['message']);
+        $messageLabel = ($state['flow'] ?? '') === 'prayer' ? 'Молитвенная нужда' : 'Сообщение';
+        $lines[] = '<b>' . $messageLabel . ':</b>' . "\n" . html((string) $data['message']);
     }
     $lines[] = '<b>Контакт:</b> ' . html((string) ($data['contact'] ?? 'не указан'));
     $telegramName = isset($user['username']) ? '@' . $user['username'] : 'без username';
@@ -381,14 +383,16 @@ function beginFlow(array $config, string $storageDir, array $user, int|string $c
 {
     saveState($storageDir, (int) $user['id'], [
         'flow' => $flow,
-        'step' => $flow === 'feedback' ? 'message' : 'name',
+        'step' => in_array($flow, ['feedback', 'prayer'], true) ? 'message' : 'name',
         'data' => $data,
         'updated_at' => time(),
     ]);
 
-    $prompt = $flow === 'feedback'
-        ? '<b>Вопрос или предложение</b>' . "\n\n" . 'Напиши одним сообщением всё, что хочешь передать команде.'
-        : '<b>' . flowTitle($flow) . '</b>' . "\n\n" . 'Как тебя зовут?';
+    $prompt = match ($flow) {
+        'feedback' => '<b>Вопрос или предложение</b>' . "\n\n" . 'Напиши одним сообщением всё, что хочешь передать команде.',
+        'prayer' => '<b>Молитвенная нужда</b>' . "\n\n" . 'Напиши одним сообщением, о чём команда может помолиться.',
+        default => '<b>' . flowTitle($flow) . '</b>' . "\n\n" . 'Как тебя зовут?',
+    };
     sendText($config, $chatId, $prompt, cancelKeyboard());
 }
 
@@ -466,7 +470,10 @@ function handleFormMessage(array $config, string $storageDir, array $message, ar
         $state['data']['message'] = $text;
         $state['step'] = 'contact_optional';
         saveState($storageDir, (int) $user['id'], $state);
-        sendText($config, $chatId, 'Можешь оставить контакт для ответа или отправить без контакта.', contactKeyboard($user['username'] ?? null, true));
+        $contactPrompt = $flow === 'prayer'
+            ? 'Если хочешь, оставь контакт, чтобы мы могли поддержать тебя лично. Можно отправить нужду без контакта.'
+            : 'Можешь оставить контакт для ответа или отправить без контакта.';
+        sendText($config, $chatId, $contactPrompt, contactKeyboard($user['username'] ?? null, true));
         return;
     }
 
@@ -558,7 +565,13 @@ try {
         } elseif ($data === 'form_homegroup_start') {
             beginFlow($config, $storageDir, $user, $chatId, 'homegroup');
         } elseif ($data === 'feat_prays') {
-            editPhoto($config, $message, 'prays.jpg', 'молитвенная поддержка — это Божья атмосфера помощи и единства!' . "\n\n" . '<a href="https://forms.yandex.ru/u/68446f8c505690a7125513ca">отправить молитвенную нужду!</a>', backKeyboard('back_features'));
+            logEvent($storageDir, $user, 'Молитвенная поддержка');
+            editPhoto($config, $message, 'prays.jpg', 'молитвенная поддержка — это Божья атмосфера помощи и единства!' . "\n\n" . 'Нажми кнопку ниже и напиши нужду прямо здесь. Её получит только команда, которая будет молиться за тебя.', ['inline_keyboard' => [
+                [['text' => 'Написать молитвенную нужду', 'callback_data' => 'form_prayer_start']],
+                [['text' => 'Назад', 'callback_data' => 'back_features']],
+            ]]);
+        } elseif ($data === 'form_prayer_start') {
+            beginFlow($config, $storageDir, $user, $chatId, 'prayer');
         } elseif ($data === 'feat_finance') {
             editPhoto($config, $message, 'finance.jpg', 'Бог доверил тебе многое: не только финансы, но и время, способности, силы.' . "\n" . 'всё это — ресурсы, через которые можно служить людям, делать добро и быть частью Божьего дела.' . "\n" . 'щедрость — это не про обязанность, а про сердце, готовое откликаться!' . "\n\n" . '<blockquote>«Не собирайте себе сокровищ на земле, где моль и ржа истребляют и где воры подкапывают и крадут; но собирайте себе сокровища на небе, где ни моль, ни ржа не истребляют и где воры не подкапывают и не крадут»' . "\n" . '(Евангелие от Матфея 6:19–20)</blockquote>' . "\n\n" . 'давайте вместе вкладываться в то, что имеет вечную ценность — в основание, которое не исчезнет и не сгорит' . "\n" . 'спасибо за твои пожертвования!', financeKeyboard());
         }

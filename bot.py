@@ -1,5 +1,6 @@
 import os
 import csv
+import html
 import logging
 from datetime import datetime
 
@@ -77,6 +78,7 @@ def load_token():
 
 
 TOKEN = load_token()
+ADMIN_CHAT_ID = os.getenv("ADMIN_CHAT_ID", "").strip()
 
 # =========================
 # ЛОГ СТАТИСТИКИ
@@ -143,10 +145,9 @@ def kb_finance():
 # =========================
 # СЛУЖЕНИЯ (ЛИСТАЛКА)
 # =========================
-APPLY_URL = "https://forms.yandex.ru/u/68e0b0bb50569060a96e8d2c"
-
 SERVE_SLIDES = [
     {
+        "title": "Команды и служения",
         "image": "team.jpg",
         "text": (
             "здесь ты найдешь все команды и служения, которые делают одно большое дело, "
@@ -156,6 +157,7 @@ SERVE_SLIDES = [
         ),
     },
     {
+        "title": "Продакшн",
         "image": "media.jpg",
         "text": (
             "продакшн — это всё, что происходит за кадром: "
@@ -165,6 +167,7 @@ SERVE_SLIDES = [
         ),
     },
     {
+        "title": "Команда прославления",
         "image": "praise.jpg",
         "text": (
             "команда прославления — это поклонение Богу через музыку\n\n"
@@ -172,6 +175,7 @@ SERVE_SLIDES = [
         ),
     },
     {
+        "title": "Команда порядка",
         "image": "poryadok.jpg",
         "text": (
             "команда порядка создаёт комфорт на служении: встречают людей, помогают, следят за порядком\n\n"
@@ -179,6 +183,7 @@ SERVE_SLIDES = [
         ),
     },
     {
+        "title": "Хозяюшки",
         "image": "eda.jpg",
         "text": (
             "хозяюшки — служение заботы и тепла. готовка, общение, атмосфера дома\n\n"
@@ -186,6 +191,7 @@ SERVE_SLIDES = [
         ),
     },
     {
+        "title": "SMM",
         "image": "smm.jpg",
         "text": (
             "SMM — это всё, что ты видишь в соцсетях молодёжки\n\n"
@@ -193,6 +199,7 @@ SERVE_SLIDES = [
         ),
     },
     {
+        "title": "Евангелизация",
         "image": "Jesus.jpg",
         "text": (
             "евангелизация — это выход за стены церкви\n\n"
@@ -210,7 +217,36 @@ def kb_serve(index: int):
             InlineKeyboardButton(f"{index+1}/{total}", callback_data="noop"),
             InlineKeyboardButton("▶", callback_data="srv_next"),
         ],
-        [InlineKeyboardButton("Оставить заявку", url=APPLY_URL)],
+        [InlineKeyboardButton("Оставить заявку", callback_data=f"form_serve_start_{index}")],
+        [InlineKeyboardButton("Назад", callback_data="back_features")],
+    ])
+
+
+def kb_form_cancel():
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("Отменить", callback_data="form_cancel")]
+    ])
+
+
+def kb_form_contact(username, optional=False):
+    rows = []
+    if username:
+        rows.append([InlineKeyboardButton(
+            f"Использовать @{username}",
+            callback_data="form_use_username",
+        )])
+    if optional:
+        rows.append([InlineKeyboardButton(
+            "Отправить без контакта",
+            callback_data="form_skip_contact",
+        )])
+    rows.append([InlineKeyboardButton("Отменить", callback_data="form_cancel")])
+    return InlineKeyboardMarkup(rows)
+
+
+def kb_form_start(label, callback_data):
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton(label, callback_data=callback_data)],
         [InlineKeyboardButton("Назад", callback_data="back_features")],
     ])
 
@@ -274,6 +310,70 @@ async def safe_edit(update, image, caption, keyboard):
         await send_photo(q.message, image, caption, keyboard)
 
 
+def flow_title(flow):
+    return {
+        "serve": "🙌 Хочу служить",
+        "homegroup": "🏠 Найти домашку",
+        "feedback": "💬 Вопрос / предложение",
+        "prayer": "🙏 Молитвенная нужда",
+    }.get(flow, "Новая заявка")
+
+
+async def begin_form(message, context, flow, data=None):
+    context.user_data["form"] = {
+        "flow": flow,
+        "step": "message" if flow in ("feedback", "prayer") else "name",
+        "data": data or {},
+    }
+    if flow == "feedback":
+        prompt = "<b>Вопрос или предложение</b>\n\nНапиши одним сообщением всё, что хочешь передать команде."
+    elif flow == "prayer":
+        prompt = "<b>Молитвенная нужда</b>\n\nНапиши одним сообщением, о чём команда может помолиться."
+    else:
+        prompt = f"<b>{flow_title(flow)}</b>\n\nКак тебя зовут?"
+    await send_text(message, prompt, kb_form_cancel())
+
+
+async def submit_form(update, context, form):
+    user = update.effective_user
+    data = form["data"]
+    lines = [f"<b>{flow_title(form['flow'])}</b>", ""]
+    labels = {
+        "service": "Служение",
+        "name": "Имя",
+        "age": "Возраст",
+        "district": "Район",
+    }
+    for key, label in labels.items():
+        if data.get(key):
+            lines.append(f"<b>{label}:</b> {html.escape(str(data[key]))}")
+    if data.get("message"):
+        label = "Молитвенная нужда" if form["flow"] == "prayer" else "Сообщение"
+        lines.append(f"<b>{label}:</b>\n{html.escape(str(data['message']))}")
+    lines.append(f"<b>Контакт:</b> {html.escape(str(data.get('contact') or 'не указан'))}")
+    username = f"@{user.username}" if user.username else "без username"
+    lines.append(f'<b>Telegram:</b> <a href="tg://user?id={user.id}">{html.escape(username)}</a>')
+
+    if ADMIN_CHAT_ID:
+        try:
+            await context.bot.send_message(
+                chat_id=ADMIN_CHAT_ID,
+                text="\n".join(lines),
+                parse_mode="HTML",
+                disable_web_page_preview=True,
+            )
+        except Exception:
+            logger.exception("Не удалось отправить заявку администраторам")
+    else:
+        logger.warning("Заявка принята, но ADMIN_CHAT_ID не задан")
+
+    context.user_data.pop("form", None)
+    await update.effective_message.reply_text(
+        "Спасибо! Всё записали и передали команде. С тобой свяжутся 🙌",
+        reply_markup=kb_features(),
+    )
+
+
 # =========================
 # /START
 # =========================
@@ -281,6 +381,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     log_event(user, "/start")
     message = update.effective_message
+    context.user_data.pop("form", None)
 
     caption = (
         'привет, давай знакомиться!\n\n'
@@ -364,28 +465,74 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await safe_edit(update, slide["image"], slide["text"], kb_serve(idx))
         return
 
+    if data == "form_cancel":
+        await q.answer()
+        context.user_data.pop("form", None)
+        await q.message.reply_text("Анкета отменена.", reply_markup=kb_features())
+        return
+
+    if data == "form_use_username":
+        await q.answer()
+        form = context.user_data.get("form")
+        if form and user.username:
+            form["data"]["contact"] = f"@{user.username}"
+            await submit_form(update, context, form)
+        return
+
+    if data == "form_skip_contact":
+        await q.answer()
+        form = context.user_data.get("form")
+        if form and form.get("step") == "contact_optional":
+            form["data"]["contact"] = ""
+            await submit_form(update, context, form)
+        return
+
+    if data.startswith("form_serve_start_"):
+        await q.answer()
+        try:
+            idx = int(data.rsplit("_", 1)[1])
+            service = SERVE_SLIDES[idx]["title"]
+        except (ValueError, IndexError):
+            service = SERVE_SLIDES[0]["title"]
+        await begin_form(q.message, context, "serve", {"service": service})
+        return
+
     if data == "feat_feedback":
         await safe_edit(update, "feedback.jpg", (
-            "у нас к тебе три вопроса:\n"
-            "1. ты нашел ошибку в постах?\n"
-            "2. у тебя есть крутое предложение?\n"
-            "3. хочешь нас поругать или похвалить?\n\n"
-            '<a href="https://forms.yandex.ru/u/693838eb49af47b74be7c00e">написать сообщение!</a>'
-        ), kb_back_features())
+            "здесь можно задать вопрос, предложить идею, сообщить об ошибке "
+            "или просто оставить обратную связь.\n\n"
+            "Нажми кнопку ниже — всё заполним прямо в боте."
+        ), kb_form_start("Написать сообщение", "form_feedback_start"))
+        return
+
+    if data == "form_feedback_start":
+        await q.answer()
+        await begin_form(q.message, context, "feedback")
         return
 
     if data == "feat_homegroup":
         await safe_edit(update, "homegroup.jpg", (
             "домашняя группа — это место, где можно поговорить по-честному, разобраться в Библии и найти своих людей!\n\n"
-            '<a href="https://forms.yandex.ru/u/6938307f1f1eb5cddcef1b93">найти домашку</a>'
-        ), kb_back_features())
+            "Нажми кнопку ниже — подберём домашку прямо здесь."
+        ), kb_form_start("Подобрать домашку", "form_homegroup_start"))
+        return
+
+    if data == "form_homegroup_start":
+        await q.answer()
+        await begin_form(q.message, context, "homegroup")
         return
 
     if data == "feat_prays":
         await safe_edit(update, "prays.jpg", (
             "молитвенная поддержка — это Божья атмосфера помощи и единства!\n\n"
-            '<a href="https://forms.yandex.ru/u/68446f8c505690a7125513ca">отправить молитвенную нужду!</a>'
-        ), kb_back_features())
+            "Нажми кнопку ниже и напиши нужду прямо здесь. "
+            "Её получит только команда, которая будет молиться за тебя."
+        ), kb_form_start("Написать молитвенную нужду", "form_prayer_start"))
+        return
+
+    if data == "form_prayer_start":
+        await q.answer()
+        await begin_form(q.message, context, "prayer")
         return
 
     if data == "feat_finance":
@@ -410,7 +557,78 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.warning("TEXT UPDATE WITHOUT MESSAGE: %s", update)
         return
 
-    await message.reply_text("Используй кнопки меню 🙂")
+    form = context.user_data.get("form")
+    if not form:
+        await message.reply_text("Используй кнопки меню 🙂")
+        return
+
+    text = (message.text or "").strip()
+    if not text:
+        await message.reply_text(
+            "Пожалуйста, отправь ответ текстом или нажми «Отменить».",
+            reply_markup=kb_form_cancel(),
+        )
+        return
+
+    step = form["step"]
+    flow = form["flow"]
+    data = form["data"]
+
+    if step == "name":
+        data["name"] = text
+        form["step"] = "age"
+        await message.reply_text("Сколько тебе лет?", reply_markup=kb_form_cancel())
+        return
+
+    if step == "age":
+        if not text.isdigit() or not 7 <= int(text) <= 99:
+            await message.reply_text(
+                "Напиши возраст цифрами, например: 19.",
+                reply_markup=kb_form_cancel(),
+            )
+            return
+        data["age"] = text
+        if flow == "homegroup":
+            form["step"] = "district"
+            await message.reply_text(
+                "В каком районе Кургана тебе удобнее посещать домашнюю группу?",
+                reply_markup=kb_form_cancel(),
+            )
+            return
+        form["step"] = "contact"
+        await message.reply_text(
+            "Оставь номер телефона или Telegram username, чтобы мы могли связаться.",
+            reply_markup=kb_form_contact(update.effective_user.username),
+        )
+        return
+
+    if step == "district":
+        data["district"] = text
+        form["step"] = "contact"
+        await message.reply_text(
+            "Оставь номер телефона или Telegram username, чтобы лидер домашки мог связаться.",
+            reply_markup=kb_form_contact(update.effective_user.username),
+        )
+        return
+
+    if step == "message":
+        data["message"] = text
+        form["step"] = "contact_optional"
+        prompt = (
+            "Если хочешь, оставь контакт, чтобы мы могли поддержать тебя лично. "
+            "Можно отправить нужду без контакта."
+            if flow == "prayer"
+            else "Можешь оставить контакт для ответа или отправить без контакта."
+        )
+        await message.reply_text(
+            prompt,
+            reply_markup=kb_form_contact(update.effective_user.username, optional=True),
+        )
+        return
+
+    if step in ("contact", "contact_optional"):
+        data["contact"] = text
+        await submit_form(update, context, form)
 
 
 async def on_error(update: object, context: ContextTypes.DEFAULT_TYPE):

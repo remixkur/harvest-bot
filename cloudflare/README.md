@@ -1,25 +1,16 @@
-# Cloudflare deployment
+# Cloudflare relay
 
-This directory contains the webhook version of the HarvestYouth Telegram bot.
+This Worker is a fast ingress relay for Telegram. It acknowledges Telegram updates immediately and forwards them in the background to the PHP webhook hosted on REG.RU. Bot logic, form state, statistics and application storage remain on REG.RU.
 
-## One-time deployment
+## Deployment
 
-1. Install dependencies: `npm install`
-2. Log in to Cloudflare: `npx wrangler login`
-3. Create D1: `npm run db:create`
-4. Put the returned database ID into `wrangler.toml`
-5. Apply migrations: `npm run db:migrate`
-6. Add secrets:
-   - `npx wrangler secret put BOT_TOKEN`
-   - `npx wrangler secret put WEBHOOK_SECRET`
-7. Deploy: `npm run deploy`
-8. Configure Telegram webhook:
+1. Install dependencies: `npm install`.
+2. Log in to Cloudflare: `npx wrangler login`.
+3. Set `UPSTREAM_URL` in `wrangler.toml` to the REG.RU webhook URL.
+4. Set the Telegram-facing secret: `npx wrangler secret put WEBHOOK_SECRET`.
+5. Set the matching REG.RU secret: `npx wrangler secret put UPSTREAM_SECRET`.
+6. Check the code: `npm run check`.
+7. Deploy: `npm run deploy`.
+8. Register `<worker-url>/webhook` as the webhook for the Telegram bot.
 
-```sh
-TELEGRAM_BOT_TOKEN="..." \
-WORKER_URL="https://harvest-youth-bot.<account>.workers.dev" \
-WEBHOOK_SECRET="..." \
-node scripts/set-webhook.mjs
-```
-
-The old polling service must be stopped only after the webhook responds successfully.
+The Worker does not contain bot tokens and does not persist user data.

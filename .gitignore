@@ -1,0 +1,5 @@
+.DS_Store
+reg-hosting/config.php
+reg-hosting/storage/*
+!reg-hosting/storage/.gitkeep
+!reg-hosting/storage/.htaccess

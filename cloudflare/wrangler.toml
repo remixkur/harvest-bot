@@ -1,13 +1,7 @@
 name = "harvest-youth-bot"
-main = "src/index.ts"
+main = "src/relay.ts"
 compatibility_date = "2026-08-01"
 workers_dev = true
 
 [vars]
-ASSET_BASE_URL = "https://raw.githubusercontent.com/remixkur/harvest-bot/main"
-
-[[d1_databases]]
-binding = "DB"
-database_name = "harvest-youth-bot"
-database_id = "7826755f-820c-4990-82c2-d6269601fb08"
-migrations_dir = "migrations"
+UPSTREAM_URL = "https://xn--80adbjgw2aox6a5dh.xn--p1ai/harvest-bot/webhook.php"

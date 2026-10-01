@@ -358,7 +358,7 @@ async function handleCallback(
       message,
       "feedback.jpg",
       "здесь можно задать вопрос, предложить идею, сообщить об ошибке или просто оставить обратную связь.\n\n" +
-        "В рабочей версии анкета заполняется прямо в боте.",
+        "в рабочей версии анкета заполняется прямо в боте.",
       { inline_keyboard: [
         [{ text: "Написать сообщение", callback_data: "form_feedback_start" }],
         [{ text: "Назад", callback_data: "back_features" }],
@@ -373,7 +373,7 @@ async function handleCallback(
       message,
       "homegroup.jpg",
       "домашняя группа — это место, где можно поговорить по-честному, разобраться в Библии и найти своих людей!\n\n" +
-        "В рабочей версии анкета заполняется прямо в боте.",
+        "в рабочей версии анкета заполняется прямо в боте.",
       { inline_keyboard: [
         [{ text: "Подобрать домашку", callback_data: "form_homegroup_start" }],
         [{ text: "Назад", callback_data: "back_features" }],
@@ -388,7 +388,7 @@ async function handleCallback(
       message,
       "prays.jpg",
       "молитвенная поддержка — это Божья атмосфера помощи и единства!\n\n" +
-        "В рабочей версии нужду можно отправить прямо в боте.",
+        "в рабочей версии нужду можно отправить прямо в боте.",
       { inline_keyboard: [
         [{ text: "Написать молитвенную нужду", callback_data: "form_prayer_start" }],
         [{ text: "Назад", callback_data: "back_features" }],

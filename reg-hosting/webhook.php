@@ -315,11 +315,11 @@ function html(string $value): string
 function flowTitle(string $flow): string
 {
     return match ($flow) {
-        'serve' => '🙌 Хочу служить',
-        'homegroup' => '🏠 Найти домашку',
-        'feedback' => '💬 Вопрос / предложение',
-        'prayer' => '🙏 Молитвенная нужда',
-        default => 'Новая заявка',
+        'serve' => '🙌 хочу служить',
+        'homegroup' => '🏠 найти домашку',
+        'feedback' => '💬 вопрос / предложение',
+        'prayer' => '🙏 молитвенная нужда',
+        default => 'новая заявка',
     };
 }
 
@@ -341,24 +341,24 @@ function submitApplication(array $config, string $storageDir, array $user, array
     $data = $record['data'];
     $lines = ['<b>' . flowTitle((string) $state['flow']) . '</b>', ''];
     if (isset($data['service'])) {
-        $lines[] = '<b>Служение:</b> ' . html((string) $data['service']);
+        $lines[] = '<b>служение:</b> ' . html((string) $data['service']);
     }
     if (isset($data['name'])) {
-        $lines[] = '<b>Имя:</b> ' . html((string) $data['name']);
+        $lines[] = '<b>имя:</b> ' . html((string) $data['name']);
     }
     if (isset($data['age'])) {
-        $lines[] = '<b>Возраст:</b> ' . html((string) $data['age']);
+        $lines[] = '<b>возраст:</b> ' . html((string) $data['age']);
     }
     if (isset($data['district'])) {
-        $lines[] = '<b>Район:</b> ' . html((string) $data['district']);
+        $lines[] = '<b>район:</b> ' . html((string) $data['district']);
     }
     if (isset($data['message'])) {
-        $messageLabel = ($state['flow'] ?? '') === 'prayer' ? 'Молитвенная нужда' : 'Сообщение';
+        $messageLabel = ($state['flow'] ?? '') === 'prayer' ? 'молитвенная нужда' : 'сообщение';
         $lines[] = '<b>' . $messageLabel . ':</b>' . "\n" . html((string) $data['message']);
     }
-    $lines[] = '<b>Контакт:</b> ' . html((string) ($data['contact'] ?? 'не указан'));
+    $lines[] = '<b>контакт:</b> ' . html((string) ($data['contact'] ?? 'не указан'));
     $telegramName = isset($user['username']) ? '@' . $user['username'] : 'без username';
-    $lines[] = '<b>Telegram:</b> <a href="tg://user?id=' . (int) $user['id'] . '">' . html($telegramName) . '</a>';
+    $lines[] = '<b>telegram:</b> <a href="tg://user?id=' . (int) $user['id'] . '">' . html($telegramName) . '</a>';
 
     $adminChatId = $config['admin_chat_id'];
     $adminBotToken = (string) $config['admin_bot_token'];
@@ -389,9 +389,9 @@ function beginFlow(array $config, string $storageDir, array $user, int|string $c
     ]);
 
     $prompt = match ($flow) {
-        'feedback' => '<b>Вопрос или предложение</b>' . "\n\n" . 'Напиши одним сообщением всё, что хочешь передать команде.',
-        'prayer' => '<b>Молитвенная нужда</b>' . "\n\n" . 'Напиши одним сообщением, о чём команда может помолиться.',
-        default => '<b>' . flowTitle($flow) . '</b>' . "\n\n" . 'Как тебя зовут?',
+        'feedback' => '<b>вопрос или предложение</b>' . "\n\n" . 'напиши одним сообщением всё, что хочешь передать команде.',
+        'prayer' => '<b>молитвенная нужда</b>' . "\n\n" . 'напиши одним сообщением, о чём команда может помолиться.',
+        default => '<b>' . flowTitle($flow) . '</b>' . "\n\n" . 'как тебя зовут?',
     };
     sendText($config, $chatId, $prompt, cancelKeyboard());
 }
@@ -403,7 +403,7 @@ function finishFlow(array $config, string $storageDir, array $user, int|string $
     sendText(
         $config,
         $chatId,
-        'Спасибо! Всё записали и передали команде. С тобой свяжутся 🙌',
+        'спасибо! всё записали и передали команде. с тобой свяжутся 🙌',
         featuresKeyboard()
     );
 }
@@ -417,13 +417,13 @@ function handleFormMessage(array $config, string $storageDir, array $message, ar
         $text = (string) $message['contact']['phone_number'];
     }
     if ($text === '') {
-        sendText($config, $chatId, 'Пожалуйста, отправь ответ текстом или нажми «Отменить».', cancelKeyboard());
+        sendText($config, $chatId, 'пожалуйста, отправь ответ текстом или нажми «Отменить».', cancelKeyboard());
         return;
     }
 
     if ($text === '/cancel') {
         clearState($storageDir, (int) $user['id']);
-        sendText($config, $chatId, 'Анкета отменена.', featuresKeyboard());
+        sendText($config, $chatId, 'анкета отменена.', featuresKeyboard());
         return;
     }
 
@@ -436,25 +436,25 @@ function handleFormMessage(array $config, string $storageDir, array $message, ar
         $state['data']['name'] = $text;
         $state['step'] = 'age';
         saveState($storageDir, (int) $user['id'], $state);
-        sendText($config, $chatId, 'Сколько тебе лет?', cancelKeyboard());
+        sendText($config, $chatId, 'сколько тебе лет?', cancelKeyboard());
         return;
     }
 
     if ($step === 'age') {
         if (!preg_match('/^\d{1,2}$/', $text) || (int) $text < 7 || (int) $text > 99) {
-            sendText($config, $chatId, 'Напиши возраст цифрами, например: 19.', cancelKeyboard());
+            sendText($config, $chatId, 'напиши возраст цифрами, например: 19.', cancelKeyboard());
             return;
         }
         $state['data']['age'] = $text;
         if ($flow === 'homegroup') {
             $state['step'] = 'district';
             saveState($storageDir, (int) $user['id'], $state);
-            sendText($config, $chatId, 'В каком районе Кургана тебе удобнее посещать домашнюю группу?', cancelKeyboard());
+            sendText($config, $chatId, 'в каком районе Кургана тебе удобнее посещать домашнюю группу?', cancelKeyboard());
             return;
         }
         $state['step'] = 'contact';
         saveState($storageDir, (int) $user['id'], $state);
-        sendText($config, $chatId, 'Оставь номер телефона или Telegram username, чтобы мы могли связаться.', contactKeyboard($user['username'] ?? null, false));
+        sendText($config, $chatId, 'оставь номер телефона или Telegram username, чтобы мы могли связаться.', contactKeyboard($user['username'] ?? null, false));
         return;
     }
 
@@ -462,7 +462,7 @@ function handleFormMessage(array $config, string $storageDir, array $message, ar
         $state['data']['district'] = $text;
         $state['step'] = 'contact';
         saveState($storageDir, (int) $user['id'], $state);
-        sendText($config, $chatId, 'Оставь номер телефона или Telegram username, чтобы лидер домашки мог связаться.', contactKeyboard($user['username'] ?? null, false));
+        sendText($config, $chatId, 'оставь номер телефона или Telegram username, чтобы лидер домашки мог связаться.', contactKeyboard($user['username'] ?? null, false));
         return;
     }
 
@@ -471,8 +471,8 @@ function handleFormMessage(array $config, string $storageDir, array $message, ar
         $state['step'] = 'contact_optional';
         saveState($storageDir, (int) $user['id'], $state);
         $contactPrompt = $flow === 'prayer'
-            ? 'Если хочешь, оставь контакт, чтобы мы могли поддержать тебя лично. Можно отправить нужду без контакта.'
-            : 'Можешь оставить контакт для ответа или отправить без контакта.';
+            ? 'если хочешь, оставь контакт, чтобы мы могли поддержать тебя лично. можно отправить нужду без контакта.'
+            : 'можешь оставить контакт для ответа или отправить без контакта.';
         sendText($config, $chatId, $contactPrompt, contactKeyboard($user['username'] ?? null, true));
         return;
     }
@@ -512,7 +512,7 @@ try {
         $chatId = $message['chat']['id'];
         if ($data === 'form_cancel') {
             clearState($storageDir, (int) $user['id']);
-            sendText($config, $chatId, 'Анкета отменена.', featuresKeyboard());
+            sendText($config, $chatId, 'анкета отменена.', featuresKeyboard());
             jsonResponse(['ok' => true]);
         }
 
@@ -550,7 +550,7 @@ try {
             beginFlow($config, $storageDir, $user, $chatId, 'serve', ['service' => $service]);
         } elseif ($data === 'feat_feedback') {
             logEvent($storageDir, $user, 'Вопрос / предложение');
-            editPhoto($config, $message, 'feedback.jpg', 'здесь можно задать вопрос, предложить идею, сообщить об ошибке или просто оставить обратную связь.' . "\n\n" . 'Нажми кнопку ниже — всё заполним прямо в боте.', ['inline_keyboard' => [
+            editPhoto($config, $message, 'feedback.jpg', 'здесь можно задать вопрос, предложить идею, сообщить об ошибке или просто оставить обратную связь.' . "\n\n" . 'нажми кнопку ниже — всё заполним прямо в боте.', ['inline_keyboard' => [
                 [['text' => 'Написать сообщение', 'callback_data' => 'form_feedback_start']],
                 [['text' => 'Назад', 'callback_data' => 'back_features']],
             ]]);
@@ -558,7 +558,7 @@ try {
             beginFlow($config, $storageDir, $user, $chatId, 'feedback');
         } elseif ($data === 'feat_homegroup') {
             logEvent($storageDir, $user, 'Найти домашку');
-            editPhoto($config, $message, 'homegroup.jpg', 'домашняя группа — это место, где можно поговорить по-честному, разобраться в Библии и найти своих людей!' . "\n\n" . 'Нажми кнопку ниже — подберём домашку прямо здесь.', ['inline_keyboard' => [
+            editPhoto($config, $message, 'homegroup.jpg', 'домашняя группа — это место, где можно поговорить по-честному, разобраться в Библии и найти своих людей!' . "\n\n" . 'нажми кнопку ниже — подберём домашку прямо здесь.', ['inline_keyboard' => [
                 [['text' => 'Подобрать домашку', 'callback_data' => 'form_homegroup_start']],
                 [['text' => 'Назад', 'callback_data' => 'back_features']],
             ]]);
@@ -566,7 +566,7 @@ try {
             beginFlow($config, $storageDir, $user, $chatId, 'homegroup');
         } elseif ($data === 'feat_prays') {
             logEvent($storageDir, $user, 'Молитвенная поддержка');
-            editPhoto($config, $message, 'prays.jpg', 'молитвенная поддержка — это Божья атмосфера помощи и единства!' . "\n\n" . 'Нажми кнопку ниже и напиши нужду прямо здесь. Её получит только команда, которая будет молиться за тебя.', ['inline_keyboard' => [
+            editPhoto($config, $message, 'prays.jpg', 'молитвенная поддержка — это Божья атмосфера помощи и единства!' . "\n\n" . 'нажми кнопку ниже и напиши нужду прямо здесь. её получит только команда, которая будет молиться за тебя.', ['inline_keyboard' => [
                 [['text' => 'Написать молитвенную нужду', 'callback_data' => 'form_prayer_start']],
                 [['text' => 'Назад', 'callback_data' => 'back_features']],
             ]]);

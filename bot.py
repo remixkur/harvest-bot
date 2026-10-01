@@ -312,11 +312,11 @@ async def safe_edit(update, image, caption, keyboard):
 
 def flow_title(flow):
     return {
-        "serve": "🙌 Хочу служить",
-        "homegroup": "🏠 Найти домашку",
-        "feedback": "💬 Вопрос / предложение",
-        "prayer": "🙏 Молитвенная нужда",
-    }.get(flow, "Новая заявка")
+        "serve": "🙌 хочу служить",
+        "homegroup": "🏠 найти домашку",
+        "feedback": "💬 вопрос / предложение",
+        "prayer": "🙏 молитвенная нужда",
+    }.get(flow, "новая заявка")
 
 
 async def begin_form(message, context, flow, data=None):
@@ -326,11 +326,11 @@ async def begin_form(message, context, flow, data=None):
         "data": data or {},
     }
     if flow == "feedback":
-        prompt = "<b>Вопрос или предложение</b>\n\nНапиши одним сообщением всё, что хочешь передать команде."
+        prompt = "<b>вопрос или предложение</b>\n\nнапиши одним сообщением всё, что хочешь передать команде."
     elif flow == "prayer":
-        prompt = "<b>Молитвенная нужда</b>\n\nНапиши одним сообщением, о чём команда может помолиться."
+        prompt = "<b>молитвенная нужда</b>\n\nнапиши одним сообщением, о чём команда может помолиться."
     else:
-        prompt = f"<b>{flow_title(flow)}</b>\n\nКак тебя зовут?"
+        prompt = f"<b>{flow_title(flow)}</b>\n\nкак тебя зовут?"
     await send_text(message, prompt, kb_form_cancel())
 
 
@@ -339,20 +339,20 @@ async def submit_form(update, context, form):
     data = form["data"]
     lines = [f"<b>{flow_title(form['flow'])}</b>", ""]
     labels = {
-        "service": "Служение",
-        "name": "Имя",
-        "age": "Возраст",
-        "district": "Район",
+        "service": "служение",
+        "name": "имя",
+        "age": "возраст",
+        "district": "район",
     }
     for key, label in labels.items():
         if data.get(key):
             lines.append(f"<b>{label}:</b> {html.escape(str(data[key]))}")
     if data.get("message"):
-        label = "Молитвенная нужда" if form["flow"] == "prayer" else "Сообщение"
+        label = "молитвенная нужда" if form["flow"] == "prayer" else "сообщение"
         lines.append(f"<b>{label}:</b>\n{html.escape(str(data['message']))}")
-    lines.append(f"<b>Контакт:</b> {html.escape(str(data.get('contact') or 'не указан'))}")
+    lines.append(f"<b>контакт:</b> {html.escape(str(data.get('contact') or 'не указан'))}")
     username = f"@{user.username}" if user.username else "без username"
-    lines.append(f'<b>Telegram:</b> <a href="tg://user?id={user.id}">{html.escape(username)}</a>')
+    lines.append(f'<b>telegram:</b> <a href="tg://user?id={user.id}">{html.escape(username)}</a>')
 
     if ADMIN_CHAT_ID:
         try:
@@ -369,7 +369,7 @@ async def submit_form(update, context, form):
 
     context.user_data.pop("form", None)
     await update.effective_message.reply_text(
-        "Спасибо! Всё записали и передали команде. С тобой свяжутся 🙌",
+        "спасибо! всё записали и передали команде. с тобой свяжутся 🙌",
         reply_markup=kb_features(),
     )
 
@@ -468,7 +468,7 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data == "form_cancel":
         await q.answer()
         context.user_data.pop("form", None)
-        await q.message.reply_text("Анкета отменена.", reply_markup=kb_features())
+        await q.message.reply_text("анкета отменена.", reply_markup=kb_features())
         return
 
     if data == "form_use_username":
@@ -501,7 +501,7 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await safe_edit(update, "feedback.jpg", (
             "здесь можно задать вопрос, предложить идею, сообщить об ошибке "
             "или просто оставить обратную связь.\n\n"
-            "Нажми кнопку ниже — всё заполним прямо в боте."
+            "нажми кнопку ниже — всё заполним прямо в боте."
         ), kb_form_start("Написать сообщение", "form_feedback_start"))
         return
 
@@ -513,7 +513,7 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data == "feat_homegroup":
         await safe_edit(update, "homegroup.jpg", (
             "домашняя группа — это место, где можно поговорить по-честному, разобраться в Библии и найти своих людей!\n\n"
-            "Нажми кнопку ниже — подберём домашку прямо здесь."
+            "нажми кнопку ниже — подберём домашку прямо здесь."
         ), kb_form_start("Подобрать домашку", "form_homegroup_start"))
         return
 
@@ -525,8 +525,8 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data == "feat_prays":
         await safe_edit(update, "prays.jpg", (
             "молитвенная поддержка — это Божья атмосфера помощи и единства!\n\n"
-            "Нажми кнопку ниже и напиши нужду прямо здесь. "
-            "Её получит только команда, которая будет молиться за тебя."
+            "нажми кнопку ниже и напиши нужду прямо здесь. "
+            "её получит только команда, которая будет молиться за тебя."
         ), kb_form_start("Написать молитвенную нужду", "form_prayer_start"))
         return
 
@@ -565,7 +565,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = (message.text or "").strip()
     if not text:
         await message.reply_text(
-            "Пожалуйста, отправь ответ текстом или нажми «Отменить».",
+            "пожалуйста, отправь ответ текстом или нажми «Отменить».",
             reply_markup=kb_form_cancel(),
         )
         return
@@ -577,13 +577,13 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if step == "name":
         data["name"] = text
         form["step"] = "age"
-        await message.reply_text("Сколько тебе лет?", reply_markup=kb_form_cancel())
+        await message.reply_text("сколько тебе лет?", reply_markup=kb_form_cancel())
         return
 
     if step == "age":
         if not text.isdigit() or not 7 <= int(text) <= 99:
             await message.reply_text(
-                "Напиши возраст цифрами, например: 19.",
+                "напиши возраст цифрами, например: 19.",
                 reply_markup=kb_form_cancel(),
             )
             return
@@ -591,13 +591,13 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if flow == "homegroup":
             form["step"] = "district"
             await message.reply_text(
-                "В каком районе Кургана тебе удобнее посещать домашнюю группу?",
+                "в каком районе Кургана тебе удобнее посещать домашнюю группу?",
                 reply_markup=kb_form_cancel(),
             )
             return
         form["step"] = "contact"
         await message.reply_text(
-            "Оставь номер телефона или Telegram username, чтобы мы могли связаться.",
+            "оставь номер телефона или Telegram username, чтобы мы могли связаться.",
             reply_markup=kb_form_contact(update.effective_user.username),
         )
         return
@@ -606,7 +606,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         data["district"] = text
         form["step"] = "contact"
         await message.reply_text(
-            "Оставь номер телефона или Telegram username, чтобы лидер домашки мог связаться.",
+            "оставь номер телефона или Telegram username, чтобы лидер домашки мог связаться.",
             reply_markup=kb_form_contact(update.effective_user.username),
         )
         return
@@ -615,10 +615,10 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         data["message"] = text
         form["step"] = "contact_optional"
         prompt = (
-            "Если хочешь, оставь контакт, чтобы мы могли поддержать тебя лично. "
-            "Можно отправить нужду без контакта."
+            "если хочешь, оставь контакт, чтобы мы могли поддержать тебя лично. "
+            "можно отправить нужду без контакта."
             if flow == "prayer"
-            else "Можешь оставить контакт для ответа или отправить без контакта."
+            else "можешь оставить контакт для ответа или отправить без контакта."
         )
         await message.reply_text(
             prompt,
